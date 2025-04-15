@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>资源时间计算器</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 30px;
+      background: #f9f9f9;
+    }
+    h1 {
+      color: #333;
+    }
+    .container {
+      background: #fff;
+      padding: 20px;
+      border-radius: 12px;
+      max-width: 400px;
+      margin: auto;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    label {
+      display: block;
+      margin-top: 15px;
+      font-weight: bold;
+    }
+    input[type="number"] {
+      width: 100%;
+      padding: 8px;
+      margin-top: 5px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+    }
+    .result {
+      margin-top: 20px;
+      font-size: 18px;
+      color: #0066cc;
+    }
+    button {
+      margin-top: 20px;
+      padding: 10px 15px;
+      background-color: #007BFF;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>资源时间计算器</h1>
+
+    <label for="required">需要的资源数（亿）：</label>
+    <input type="number" id="required" />
+
+    <label for="current">现有资源数（亿）：</label>
+    <input type="number" id="current" />
+
+    <label for="rate">资源生产速度（万/秒）：</label>
+    <input type="number" id="rate" />
+
+    <button onclick="calculateTime()">计算</button>
+
+    <div class="result" id="result">请输入数据并点击“计算”</div>
+  </div>
+
+  <script>
+    function calculateTime() {
+      const required = parseFloat(document.getElementById('required').value);
+      const current = parseFloat(document.getElementById('current').value);
+      const rate = parseFloat(document.getElementById('rate').value);
+      const resultDiv = document.getElementById('result');
+
+      if (isNaN(required) || isNaN(current) || isNaN(rate) || rate <= 0) {
+        resultDiv.textContent = '请输入有效的数字，且生产速度必须大于0';
+        return;
+      }
+
+      const remaining = required - current;
+      if (remaining <= 0) {
+        resultDiv.textContent = '已经拥有足够的资源！';
+        return;
+      }
+
+      const timeInHours = remaining *10000 / rate / 3600;
+      const hours = Math.floor(timeInHours);
+      const minutes = Math.round((timeInHours - hours) * 60);
+      
+      let timeText = '';
+      if (hours > 0) {
+        timeText += `${hours} 小时`;
+      }
+      if (minutes > 0) {
+        timeText += ` ${minutes} 分钟`;
+      }
+      
+      resultDiv.textContent = `预计需要时间：${timeText}`;
+    }
+  </script>
+</body>
+</html>
