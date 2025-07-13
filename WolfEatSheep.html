@@ -18,7 +18,27 @@
             padding: 10px;
             box-sizing: border-box;
         }
-
+        .main-flex, .side-bar { display: none; }
+        .bottom-bar {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: center;
+            gap: 24px;
+            margin-bottom: 10px;
+        }
+        .bottom-bar .info {
+            font-size: 1.2em;
+            color: #a97b50;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+        .bottom-bar .btn {
+            min-width: 100px;
+            margin: 0;
+        }
+        /* 移除.rules-btn和.back-menu-btn的独立样式 */
+        /* .rules-btn, .back-menu-btn { ... } 及其:hover 全部移除 */
         .game-container {
             display: flex;
             flex-direction: column;
@@ -65,13 +85,7 @@
         #restart-button:hover {
             background-color: #6d4c41;
         }
-        .top-bar {
-            width: 100%;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-        }
+        .top-bar { display: none; }
         .info {
             font-size: 1.3em;
             color: #a97b50;
@@ -82,6 +96,7 @@
             display: flex;
             gap: 10px;
         }
+        /* 只保留.btn样式 */
         .btn {
             background: #e2c9a0;
             color: #fff;
@@ -93,26 +108,158 @@
             cursor: pointer;
             box-shadow: 0 2px 6px rgba(0,0,0,0.07);
             transition: background 0.2s;
+            min-width: 100px;
+            text-align: center;
+            display: inline-block;
         }
         .btn:hover {
             background: #c9a06c;
+            color: #fff;
+        }
+        .game-rules {
+            background: #fff8e1;
+            border: 1.5px solid #e2c9a0;
+            border-radius: 12px;
+            padding: 18px 24px;
+            margin-bottom: 24px;
+            max-width: 500px;
+            color: #6d4c41;
+            font-size: 1.08em;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        .game-rules h2 {
+            margin-top: 0;
+            color: #a97b50;
+            font-size: 1.25em;
+            margin-bottom: 10px;
+        }
+        .game-rules ul {
+            margin: 0 0 0 1.2em;
+            padding: 0;
+        }
+        .game-rules li {
+            margin-bottom: 6px;
+        }
+        .back-menu-btn {
+            display: inline-block;
+            margin: 18px auto 0 auto;
+            background: #e2c9a0;
+            color: #4a4a4a;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1em;
+            font-weight: bold;
+            padding: 10px 32px;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.07);
+            transition: background 0.2s, color 0.2s;
+        }
+        .back-menu-btn:hover {
+            background: #c9a06c;
+            color: #fff;
+        }
+        .rules-btn {
+            display: inline-block;
+            margin: 18px auto 0 auto;
+            background: #e2c9a0;
+            color: #4a4a4a;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1em;
+            font-weight: bold;
+            padding: 10px 32px;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.07);
+            transition: background 0.2s, color 0.2s;
+        }
+        .rules-btn:hover {
+            background: #c9a06c;
+            color: #fff;
+        }
+        .rules-modal-mask {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.25);
+            z-index: 1000;
+            display: none;
+        }
+        .rules-modal-mask.active {
+            display: block;
+        }
+        .rules-modal {
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: #fff8e1;
+            border: 1.5px solid #e2c9a0;
+            border-radius: 16px;
+            padding: 28px 32px 18px 32px;
+            max-width: 90vw;
+            width: 400px;
+            color: #6d4c41;
+            font-size: 1.08em;
+            box-shadow: 0 6px 32px rgba(0,0,0,0.18);
+            z-index: 1001;
+            display: none;
+        }
+        .rules-modal.active {
+            display: block;
+        }
+        .rules-modal h2 {
+            margin-top: 0;
+            color: #a97b50;
+            font-size: 1.25em;
+            margin-bottom: 10px;
+        }
+        .rules-modal ul {
+            margin: 0 0 0 1.2em;
+            padding: 0;
+        }
+        .rules-modal li {
+            margin-bottom: 6px;
+        }
+        .close-rules-btn {
+            display: block;
+            margin: 18px auto 0 auto;
+            background: #e2c9a0;
+            color: #4a4a4a;
+            border: none;
+            border-radius: 10px;
+            font-size: 1em;
+            font-weight: bold;
+            padding: 8px 32px;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.07);
+            transition: background 0.2s, color 0.2s;
+        }
+        .close-rules-btn:hover {
+            background: #c9a06c;
+            color: #fff;
         }
     </style>
 </head>
 <body>
-
     <div class="game-container">
-        <div class="top-bar">
-            <div class="info" id="info-bar"></div>
-            <div class="btn-group">
-                <button class="btn" id="settings-button">设置</button>
-                <button class="btn" id="restart-button">重新开始</button>
-            </div>
-        </div>
         <canvas id="game-board" width="400" height="570"></canvas>
         <div class="controls">
+            <div class="bottom-bar">
+                <div class="info" id="info-bar"></div>
+                <button class="btn" id="restart-button">重新开始</button>
+                <button class="btn" id="show-rules-btn">游戏规则</button>
+                <button class="btn" id="back-menu-btn">返回主菜单</button>
+            </div>
             <div id="status"></div>
         </div>
+    </div>
+    <div class="rules-modal-mask" id="rules-mask"></div>
+    <div class="rules-modal" id="rules-modal">
+        <h2>游戏说明 · 狼吃羊</h2>
+        <ul>
+            <li><b>狼走法：</b>共两只狼，可沿直线或斜线走一步。若沿直线跳过羊，且跳到被吃羊的下一个空位置，则可吃掉该羊。</li>
+            <li><b>羊走法：</b>共23只羊，开局先放8只。之后每步将羊放在空位。放完所有羊后，可移动一只羊沿直线或斜线走一步。</li>
+            <li><b>输赢判别：</b>狼先走，之后轮流。羊剩12只即判羊输；若两只狼都无法走动，则判狼输。</li>
+        </ul>
+        <button class="close-rules-btn" id="close-rules-btn">关闭</button>
     </div>
 
     <script>
@@ -140,10 +287,10 @@
     // 下方菱形顶点y=360，底部y=520
     const nodes = [
         // 上方菱形
-        { id: 0, x: 200, y: 40 },    // 顶点
-        { id: 1, x: 160, y: 80 },    // 左
+        { id: 0, x: 200, y: 20 },    // 顶点
+        { id: 1, x: 140, y: 70 },    // 左
         { id: 2, x: 200, y: 120 },   // 底（与网格最上中点重合）
-        { id: 3, x: 240, y: 80 },    // 右
+        { id: 3, x: 260, y: 70 },    // 右
 
         // 主体4x4网格（5x5个交点，恢复id:6）
         { id: 4, x: 80,  y: 120 }, { id: 5, x: 140, y: 120 }, { id: 6, x: 200, y: 120 }, { id: 7, x: 260, y: 120 }, { id: 8, x: 320, y: 120 },
@@ -154,23 +301,22 @@
 
         // 下方菱形（恢复id:29）
         { id: 29, x: 200, y: 360 },   // 顶点（与网格最下中点重合）
-        { id: 30, x: 160, y: 400 },   // 左
-        { id: 31, x: 200, y: 440 },   // 底
-        { id: 32, x: 240, y: 400 },   // 右
-        { id: 33, x: 200, y: 80 },    // 上菱形交叉点
-        { id: 34, x: 200, y: 400 }    // 下菱形交叉点
+        { id: 30, x: 140, y: 410 },   // 左
+        { id: 31, x: 200, y: 460 },   // 底
+        { id: 32, x: 260, y: 410 },   // 右
+        { id: 33, x: 200, y: 70 },    // 上菱形交叉点
+        { id: 34, x: 200, y: 410 }    // 下菱形交叉点
     ];
 
     const connections = [
         // 上方菱形的边和对角线
         [0, 1], [1, 2], [2, 3], [3, 0], // 四条边
-        [0, 2], [1, 3],                 // 两条对角线
+        
         // 上方菱形交叉线
         [0,33], [1,33], [2,33], [3,33],
 
         // 下方菱形的边和对角线
         [29, 30], [30, 31], [31, 32], [32, 29], // 四条边
-        [29, 31], [30, 32],                     // 两条对角线
         // 下方菱形交叉线
         [29,34], [30,34], [31,34], [32,34],
 
@@ -189,7 +335,7 @@
         [8,13],[13,18],[18,23],[23,28],
 
         // 4x4大正方形主对角线
-        [4, 10], [10, 16], [16, 22], [22, 28],[8,12],[12,16],[16,20],[20,24],[6,10],[10,14],[14,20],[20,26],[26,22],[22,18],[18,12],[12,6]
+        [4, 10], [10, 16], [16, 22], [22, 28],[8,12],[12,16],[16,20],[20,24],[6,10],[2,10],[10,14],[14,20],[20,26],[20,29],[29,22],[26,22],[22,18],[18,12],[12,2],[12,6]
     ];
 
     // --- 预定义跳吃路线 ---
@@ -293,7 +439,10 @@
                 ctx.arc(node.x, node.y, 20, 0, 2 * Math.PI);
                 // 狼行动时，未选中为红色，选中为绿色
                 if (gameState.turn === 'WOLF') {
-                    if (gameState.selectedPieceIndex === wolfId) {
+                    if (
+                        wolfId !== undefined &&
+                        getAllEquivalentIndices(wolfId).includes(gameState.selectedPieceIndex)
+                    ) {
                         ctx.fillStyle = '#4caf50'; // 绿色
                     } else {
                         ctx.fillStyle = '#e53935'; // 红色
@@ -407,10 +556,12 @@
     function calculateValidMoves(pieceIndex) {
         const pieceType = gameState.board[pieceIndex];
         const moves = [];
-        // 只取自身节点的邻居
-        let neighbors = getNeighbors(pieceIndex);
+        // 合并所有等价点的邻居（单步走和跳吃一致）
+        let neighbors = [];
+        getAllEquivalentIndices(pieceIndex).forEach(idx => {
+            neighbors = neighbors.concat(getNeighbors(idx));
+        });
         neighbors = [...new Set(neighbors)];
-
 
 
         if (pieceType === 1) { // Sheep movement
@@ -429,11 +580,10 @@
                     let overNeighbors = getNeighbors(over);
                     overNeighbors = [...new Set(overNeighbors)];
                     overNeighbors.forEach(jumpTo => {
-                        if (
+                        const isValidJump = (
                             jumpTo !== pieceIndex &&
                             gameState.board[jumpTo] === 0 &&
-                            gameState.board[over] === 1 && // 只允许over本身有羊
-                            // 检查是否在预定义的跳吃路线中，允许from和to互换
+                            gameState.board[over] === 1 &&
                             validJumpPaths.some(path => {
                                 const [a, b, c] = path;
                                 return (
@@ -445,7 +595,20 @@
                                      getAllEquivalentIndices(pieceIndex).includes(c))
                                 );
                             })
-                        ) {
+                        );
+                        // 调试输出
+                        if (gameState.turn === 'WOLF') {
+                            console.log('[跳吃判定]', {
+                                from: pieceIndex,
+                                over,
+                                to: jumpTo,
+                                fromNeighbors: getNeighbors(pieceIndex),
+                                overNeighbors: overNeighbors,
+                                board: [...gameState.board],
+                                valid: isValidJump
+                            });
+                        }
+                        if (isValidJump) {
                             moves.push({ to: jumpTo, type: 'JUMP', jumped: over });
                         }
                     });
@@ -512,6 +675,17 @@
         }
     }
 
+    function checkWolfCanMove() {
+        for (let i = 0; i < gameState.board.length; i++) {
+            if (gameState.board[i] === 2) {
+                if (calculateValidMoves(i).length > 0) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     function handleCanvasClick(event) {
         if (gameState.gameOver) return;
 
@@ -527,6 +701,9 @@
 
         const { turn, phase } = gameState;
 
+        const eqIndices = getAllEquivalentIndices(clickedNodeIndex);
+        console.log('点击的节点:', clickedNodeIndex, '等价集合:', eqIndices);
+
         if (turn === 'SHEEP') {
             if (phase === 'PLACEMENT') {
                 if (gameState.board[clickedNodeIndex] === 0) {
@@ -540,10 +717,36 @@
                     checkWinConditions();
                 }
             } else { // MOVEMENT phase
-                handlePieceMovement(clickedNodeIndex, 1, 'WOLF');
+                if (
+                    eqIndices.some(idx => gameState.board[idx] === 1) &&
+                    gameState.selectedPieceIndex !== clickedNodeIndex
+                ) {
+                    const realIdx = eqIndices.find(idx => gameState.board[idx] === 1);
+                    gameState.selectedPieceIndex = realIdx;
+                    gameState.validMoves = calculateValidMoves(realIdx);
+                } else {
+                    handlePieceMovement(clickedNodeIndex, 1, 'WOLF');
+                }
             }
         } else if (turn === 'WOLF') {
-            handlePieceMovement(clickedNodeIndex, 2, 'SHEEP');
+            // 新增：狼无路可走直接判负
+            if (!checkWolfCanMove()) {
+                gameState.gameOver = true;
+                gameState.winner = 'SHEEP';
+                updateStatus();
+                draw();
+                return;
+            }
+            if (
+                eqIndices.some(idx => gameState.board[idx] === 2) &&
+                gameState.selectedPieceIndex !== clickedNodeIndex
+            ) {
+                const realIdx = eqIndices.find(idx => gameState.board[idx] === 2);
+                gameState.selectedPieceIndex = realIdx;
+                gameState.validMoves = calculateValidMoves(realIdx);
+            } else {
+                handlePieceMovement(clickedNodeIndex, 2, 'SHEEP');
+            }
         }
 
         updateStatus();
@@ -551,33 +754,44 @@
     }
 
     function handlePieceMovement(clickedIndex, pieceType, nextTurn) {
-        // If a piece of the current player is clicked, select it
-        if (gameState.board[clickedIndex] === pieceType && gameState.selectedPieceIndex !== clickedIndex) {
-            gameState.selectedPieceIndex = clickedIndex;
-            gameState.validMoves = calculateValidMoves(clickedIndex);
+        // 归一化：如果点击的是等价点集合，找到实际有棋子的 index（选中）或空位 index（移动）
+        const eqIndices = getAllEquivalentIndices(clickedIndex);
+        let realClickedIndex = clickedIndex;
+        if (gameState.selectedPieceIndex === -1) {
+            // 选中阶段，找有棋子的 index
+            const found = eqIndices.find(idx => gameState.board[idx] === pieceType);
+            if (found !== undefined) realClickedIndex = found;
+        } else {
+            // 移动阶段，找空位
+            const found = eqIndices.find(idx => gameState.board[idx] === 0);
+            if (found !== undefined) realClickedIndex = found;
         }
-        // If a selected piece is clicked again, deselect it
-        else if (gameState.selectedPieceIndex === clickedIndex) {
+
+        // 选中棋子
+        if (gameState.board[realClickedIndex] === pieceType && gameState.selectedPieceIndex !== realClickedIndex) {
+            gameState.selectedPieceIndex = realClickedIndex;
+            gameState.validMoves = calculateValidMoves(realClickedIndex);
+        }
+        // 取消选中
+        else if (gameState.selectedPieceIndex === realClickedIndex) {
             gameState.selectedPieceIndex = -1;
             gameState.validMoves = [];
         }
-        // If a valid move destination is clicked
+        // 移动/跳吃
         else if (gameState.selectedPieceIndex !== -1) {
-            const move = gameState.validMoves.find(m => m.to === clickedIndex);
+            // 目标点也要归一化：允许点击等价集合内任意点
+            const move = gameState.validMoves.find(m => getAllEquivalentIndices(m.to).includes(realClickedIndex));
             if (move) {
-                // Execute move
-                gameState.board[move.to] = gameState.board[gameState.selectedPieceIndex];
-                gameState.board[gameState.selectedPieceIndex] = 0;
-
-                // 清理等价节点：如果狼移动到等价节点，清理另一个等价节点
-                if (gameState.board[move.to] === 2) {
-                    const equivalentNodes = getAllEquivalentIndices(move.to);
-                    equivalentNodes.forEach(eqNode => {
-                        if (eqNode !== move.to && gameState.board[eqNode] === 2) {
-                            gameState.board[eqNode] = 0;
-                        }
-                    });
-                }
+                // 清理所有等价点
+                const allEq = Array.from(new Set([
+                    ...getAllEquivalentIndices(move.to),
+                    ...getAllEquivalentIndices(gameState.selectedPieceIndex)
+                ]));
+                allEq.forEach(idx => {
+                    gameState.board[idx] = 0;
+                });
+                // 只在目标点赋值
+                gameState.board[move.to] = pieceType;
 
                 if (move.type === 'JUMP') {
                     getAllEquivalentIndices(move.jumped).forEach(idx => {
@@ -594,13 +808,13 @@
                 gameState.validMoves = [];
                 gameState.turn = nextTurn;
 
-                // After the move, check for win conditions
-                if(nextTurn === 'WOLF'){
-                     checkWinConditions(); // Check if sheep trapped wolves
-                } else {
-                     // Check if wolves won or are trapped
-                     checkWinConditions();
+                // 新增：切换到狼回合时，若狼无路可走直接判负
+                if (nextTurn === 'WOLF' && !checkWolfCanMove()) {
+                    gameState.gameOver = true;
+                    gameState.winner = 'SHEEP';
                 }
+                // After the move, check for win conditions
+                checkWinConditions();
             }
         }
     }
@@ -608,6 +822,25 @@
     // --- Event Listeners ---
     canvas.addEventListener('click', handleCanvasClick);
     restartBtn.addEventListener('click', setupNewGame);
+
+    // 游戏规则弹窗逻辑
+    document.getElementById('show-rules-btn').onclick = function() {
+        document.getElementById('rules-modal').classList.add('active');
+        document.getElementById('rules-mask').classList.add('active');
+    };
+    document.getElementById('close-rules-btn').onclick = function() {
+        document.getElementById('rules-modal').classList.remove('active');
+        document.getElementById('rules-mask').classList.remove('active');
+    };
+    document.getElementById('rules-mask').onclick = function() {
+        document.getElementById('rules-modal').classList.remove('active');
+        document.getElementById('rules-mask').classList.remove('active');
+    };
+
+    // 返回主菜单按钮事件
+    document.getElementById('back-menu-btn').onclick = function() {
+        window.location.href = 'index.html';
+    };
 
     // --- Initial Game Start ---
     setupNewGame();

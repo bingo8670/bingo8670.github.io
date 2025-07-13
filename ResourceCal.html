@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>游戏计算器</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 30px;
+      background: #f9f9f9;
+    }
+    h1 {
+      color: #333;
+      text-align: center;
+    }
+    .calculators-container {
+      display: flex;
+      justify-content: space-around;
+      flex-wrap: wrap;
+      gap: 20px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .container {
+      background: #fff;
+      padding: 20px;
+      border-radius: 12px;
+      width: 300px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    label {
+      display: block;
+      margin-top: 15px;
+      font-weight: bold;
+    }
+    input[type="number"] {
+      width: 100%;
+      padding: 8px;
+      margin-top: 5px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+    }
+    .result {
+      margin-top: 20px;
+      font-size: 18px;
+      color: #0066cc;
+    }
+    button {
+      margin-top: 20px;
+      padding: 10px 15px;
+      background-color: #007BFF;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      width: 100%;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+  </style>
+</head>
+<body>
+  <h1>游戏计算器</h1>
+  <div class="calculators-container">
+    <!-- 资源计算器 -->
+    <div class="container">
+      <h2>资源时间计算器</h2>
+      <label for="required">需要的资源数（亿）：</label>
+      <input type="number" id="required" />
+
+      <label for="current">现有资源数（亿）：</label>
+      <input type="number" id="current" />
+
+      <label for="rate">资源生产速度（万/秒）：</label>
+      <input type="number" id="rate" />
+
+      <button onclick="calculateResourceTime()">计算</button>
+
+      <div class="result" id="resourceResult">请输入数据并点击"计算"</div>
+    </div>
+
+    <!-- 人口计算器 -->
+    <div class="container">
+      <h2>人口时间计算器</h2>
+      <label for="popRequired">需要的人口（万）：</label>
+      <input type="number" id="popRequired" />
+
+      <label for="popCurrent">现在的人口（万）：</label>
+      <input type="number" id="popCurrent" />
+
+      <label for="popDailyBuy">每天可购买的人口数（万）：</label>
+      <input type="number" id="popDailyBuy" value="3" readonly />
+
+      <label for="popDailyNatural">每天自然增加的人口（万）：</label>
+      <input type="number" id="popDailyNatural" value="8.64" readonly />
+
+      <button onclick="calculatePopulationTime()">计算</button>
+
+      <div class="result" id="populationResult">请输入数据并点击"计算"</div>
+    </div>
+
+    <!-- 领土计算器 -->
+    <div class="container">
+      <h2>领土时间计算器</h2>
+      <label for="territoryRequired">需要的领土（亿）：</label>
+      <input type="number" id="territoryRequired" />
+
+      <label for="territoryCurrent">现有领土（亿）：</label>
+      <input type="number" id="territoryCurrent" />
+
+      <label for="territoryDailyBuy">每天可购买的领土（万）：</label>
+      <input type="number" id="territoryDailyBuy" value="120" readonly />
+
+      <label for="territoryDailyNatural">每天自然增加的领土（万）：</label>
+      <input type="number" id="territoryDailyNatural" value="72" readonly />
+
+      <button onclick="calculateTerritoryTime()">计算</button>
+
+      <div class="result" id="territoryResult">请输入数据并点击"计算"</div>
+    </div>
+  </div>
+
+  <script>
+    function calculateResourceTime() {
+      const required = parseFloat(document.getElementById('required').value);
+      const current = parseFloat(document.getElementById('current').value);
+      const rate = parseFloat(document.getElementById('rate').value);
+      const resultDiv = document.getElementById('resourceResult');
+
+      if (isNaN(required) || isNaN(current) || isNaN(rate) || rate <= 0) {
+        resultDiv.textContent = '请输入有效的数字，且生产速度必须大于0';
+        return;
+      }
+
+      const remaining = required - current;
+      if (remaining <= 0) {
+        resultDiv.textContent = '已经拥有足够的资源！';
+        return;
+      }
+
+      const timeInHours = remaining *10000 / rate / 3600;
+      const hours = Math.floor(timeInHours);
+      const minutes = Math.round((timeInHours - hours) * 60);
+      
+      let timeText = '';
+      if (hours > 0) {
+        timeText += `${hours} 小时`;
+      }
+      if (minutes > 0) {
+        timeText += ` ${minutes} 分钟`;
+      }
+      
+      resultDiv.textContent = `预计需要时间：${timeText}`;
+    }
+
+    function calculatePopulationTime() {
+      const required = parseFloat(document.getElementById('popRequired').value);
+      const current = parseFloat(document.getElementById('popCurrent').value);
+      const dailyBuy = 3;
+      const dailyNatural = 8.64;
+      const resultDiv = document.getElementById('populationResult');
+
+      if (isNaN(required) || isNaN(current)) {
+        resultDiv.textContent = '请输入有效的数字';
+        return;
+      }
+
+      const remaining = required - current;
+      if (remaining <= 0) {
+        resultDiv.textContent = '已经拥有足够的人口！';
+        return;
+      }
+
+      const totalDailyIncrease = dailyBuy + dailyNatural;
+      const days = remaining / totalDailyIncrease;
+      const fullDays = Math.floor(days);
+      const remainingHours = Math.round((days - fullDays) * 24);
+      
+      let timeText = '';
+      if (fullDays > 0) {
+        timeText += `${fullDays} 天`;
+      }
+      if (remainingHours > 0) {
+        timeText += ` ${remainingHours} 小时`;
+      }
+      
+      resultDiv.textContent = `预计需要时间：${timeText}`;
+    }
+
+    function calculateTerritoryTime() {
+      const required = parseFloat(document.getElementById('territoryRequired').value);
+      const current = parseFloat(document.getElementById('territoryCurrent').value);
+      const dailyBuy = 120;
+      const dailyNatural = 72;
+      const resultDiv = document.getElementById('territoryResult');
+
+      if (isNaN(required) || isNaN(current)) {
+        resultDiv.textContent = '请输入有效的数字';
+        return;
+      }
+
+      const remaining = (required - current) * 10000;
+      if (remaining <= 0) {
+        resultDiv.textContent = '已经拥有足够的领土！';
+        return;
+      }
+
+      const totalDailyIncrease = dailyBuy + dailyNatural;
+      const days = remaining / totalDailyIncrease;
+      const fullDays = Math.floor(days);
+      const remainingHours = Math.round((days - fullDays) * 24);
+      
+      let timeText = '';
+      if (fullDays > 0) {
+        timeText += `${fullDays} 天`;
+      }
+      if (remainingHours > 0) {
+        timeText += ` ${remainingHours} 小时`;
+      }
+      
+      resultDiv.textContent = `预计需要时间：${timeText}`;
+    }
+  </script>
+</body>
+</html>
