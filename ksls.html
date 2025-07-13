@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>狼吃羊</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: #f0e6d2;
+            color: #4a4a4a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            flex-direction: column;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: #fff;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+            max-width: 100%;
+        }
+
+        canvas {
+            background-color: #fdfdfd;
+            border-radius: 8px;
+            border: 2px solid #c8b7a6;
+            max-width: 100%;
+            height: auto;
+        }
+
+        .controls {
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        #status {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #5c3d2e;
+            margin-bottom: 15px;
+            min-height: 25px;
+        }
+
+        #restart-button {
+            background-color: #8d6e63;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 1em;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        #restart-button:hover {
+            background-color: #6d4c41;
+        }
+        .top-bar {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .info {
+            font-size: 1.3em;
+            color: #a97b50;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+        .btn-group {
+            display: flex;
+            gap: 10px;
+        }
+        .btn {
+            background: #e2c9a0;
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1em;
+            font-weight: bold;
+            padding: 8px 18px;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.07);
+            transition: background 0.2s;
+        }
+        .btn:hover {
+            background: #c9a06c;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="game-container">
+        <div class="top-bar">
+            <div class="info" id="info-bar"></div>
+            <div class="btn-group">
+                <button class="btn" id="settings-button">设置</button>
+                <button class="btn" id="restart-button">重新开始</button>
+            </div>
+        </div>
+        <canvas id="game-board" width="400" height="570"></canvas>
+        <div class="controls">
+            <div id="status"></div>
+        </div>
+    </div>
+
+    <script>
+    // --- 游戏主逻辑 ---
+    const canvas = document.getElementById('game-board');
+    const ctx = canvas.getContext('2d');
+    const statusEl = document.getElementById('status');
+    const restartBtn = document.getElementById('restart-button');
+    const infoBar = document.getElementById('info-bar'); // Added for new status display
+
+    // --- 游戏配置 ---
+    const BOARD_COLOR = '#c8b7a6';
+    const EMPTY_COLOR = '#ddd';
+    const SHEEP_COLOR = '#ffffff';
+    const WOLF_COLOR = '#333333';
+    const HIGHLIGHT_COLOR = 'rgba(255, 215, 0, 0.7)';
+    const VALID_MOVE_COLOR = 'rgba(76, 175, 80, 0.7)';
+    const PIECE_RADIUS = 10;
+    const CLICK_RADIUS = 15;
+
+    // --- 棋盘节点和连接定义 ---
+    // 画布宽400, 高570
+    // 上方菱形顶点y=60，底部y=120
+    // 网格最上y=120，最下y=360，间隔60
+    // 下方菱形顶点y=360，底部y=520
+    const nodes = [
+        // 上方菱形
+        { id: 0, x: 200, y: 40 },    // 顶点
+        { id: 1, x: 160, y: 80 },    // 左
+        { id: 2, x: 200, y: 120 },   // 底（与网格最上中点重合）
+        { id: 3, x: 240, y: 80 },    // 右
+
+        // 主体4x4网格（5x5个交点）
+        // y从120到360，x从80到320，间隔60
+        { id: 4, x: 80,  y: 120 }, { id: 5, x: 140, y: 120 }, { id: 6, x: 200, y: 120 }, { id: 7, x: 260, y: 120 }, { id: 8, x: 320, y: 120 },
+        { id: 9, x: 80,  y: 180 }, { id: 10, x: 140, y: 180 }, { id: 11, x: 200, y: 180 }, { id: 12, x: 260, y: 180 }, { id: 13, x: 320, y: 180 },
+        { id: 14, x: 80,  y: 240 }, { id: 15, x: 140, y: 240 }, { id: 16, x: 200, y: 240 }, { id: 17, x: 260, y: 240 }, { id: 18, x: 320, y: 240 },
+        { id: 19, x: 80,  y: 300 }, { id: 20, x: 140, y: 300 }, { id: 21, x: 200, y: 300 }, { id: 22, x: 260, y: 300 }, { id: 23, x: 320, y: 300 },
+        { id: 24, x: 80,  y: 360 }, { id: 25, x: 140, y: 360 }, { id: 26, x: 200, y: 360 }, { id: 27, x: 260, y: 360 }, { id: 28, x: 320, y: 360 },
+
+        // 下方菱形
+        { id: 29, x: 200, y: 360 },   // 顶点（与网格最下中点重合）
+        { id: 30, x: 160, y: 400 },   // 左
+        { id: 31, x: 200, y: 440 },   // 底
+        { id: 32, x: 240, y: 400 }    // 右
+    ];
+
+    const connections = [
+        // 上方菱形的边和对角线
+        [0, 1], [1, 2], [2, 3], [3, 0], // 四条边
+        [0, 2], [1, 3],                 // 两条对角线
+
+        // 下方菱形的边和对角线
+        [29, 30], [30, 31], [31, 32], [32, 29], // 四条边
+        [29, 31], [30, 32],                     // 两条对角线
+
+        // 4x4网格横线（每行5个点，4条横线）
+        [4,5],[5,6],[6,7],[7,8],
+        [9,10],[10,11],[11,12],[12,13],
+        [14,15],[15,16],[16,17],[17,18],
+        [19,20],[20,21],[21,22],[22,23],
+        [24,25],[25,26],[26,27],[27,28],
+
+        // 4x4网格竖线（每列5个点，4条竖线）
+        [4,9],[9,14],[14,19],[19,24],
+        [5,10],[10,15],[15,20],[20,25],
+        [6,11],[11,16],[16,21],[21,26],
+        [7,12],[12,17],[17,22],[22,27],
+        [8,13],[13,18],[18,23],[23,28],
+
+        // 4x4大正方形主对角线
+        [4, 10], [10, 16], [16, 22], [22, 28],[8,12],[12,16],[16,20],[20,24],[6,10],[10,14],[14,20],[20,26],[26,22],[22,18],[18,12],[12,6]
+    ];
+    // 对角线将在下一步补充
+
+    // --- 游戏状态 ---
+    let gameState = {};
+
+    function setupNewGame() {
+        gameState = {
+            board: new Array(nodes.length).fill(0), // 0: empty, 1: sheep, 2: wolf
+            turn: 'WOLF', // WOLF or SHEEP
+            phase: 'PLACEMENT', // PLACEMENT or MOVEMENT
+            sheepInHand: 23 - 8,
+            sheepOnBoard: 8,
+            sheepEaten: 0,
+            selectedPieceIndex: -1,
+            validMoves: [],
+            gameOver: false,
+            winner: null,
+        };
+
+        // Initial placement
+        gameState.board[2] = 2; // 上方狼（上方菱形底部）
+        gameState.board[26] = 2; // 下方狼（下方菱形顶部）
+
+        // 羊的位置：id 10, 11, 12, 15, 17, 20, 21, 22
+        const initialSheep = [10, 11, 12, 15, 17, 20, 21, 22];
+        initialSheep.forEach(i => gameState.board[i] = 1);
+
+        updateStatus();
+        draw();
+    }
+
+    function drawBoard() {
+        ctx.strokeStyle = BOARD_COLOR;
+        ctx.lineWidth = 2;
+        connections.forEach(([startId, endId]) => {
+            const startNode = nodes[startId];
+            const endNode = nodes[endId];
+            ctx.beginPath();
+            ctx.moveTo(startNode.x, startNode.y);
+            ctx.lineTo(endNode.x, endNode.y);
+            ctx.stroke();
+        });
+    }
+
+    function drawPieces() {
+        // 1. 生成物理点坐标到所有id的映射
+        const coordToIds = {};
+        nodes.forEach((node, i) => {
+            const key = `${node.x},${node.y}`;
+            if (!coordToIds[key]) coordToIds[key] = [];
+            coordToIds[key].push(i);
+        });
+        // 2. 只画一次棋子，优先显示狼
+        Object.entries(coordToIds).forEach(([key, ids]) => {
+            let wolfId = ids.find(id => gameState.board[id] === 2);
+            let sheepId = ids.find(id => gameState.board[id] === 1);
+            let node = nodes[ids[0]];
+            if (wolfId !== undefined) {
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(node.x, node.y, 28, 0, 2 * Math.PI);
+                ctx.fillStyle = '#f7e3b2';
+                ctx.shadowColor = 'rgba(0,0,0,0.10)';
+                ctx.shadowBlur = 6;
+                ctx.fill();
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = '#a97b50';
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+                ctx.font = 'bold 28px serif';
+                ctx.fillStyle = '#222';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('狼', node.x, node.y+2);
+                ctx.restore();
+            } else if (sheepId !== undefined) {
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(node.x, node.y, 28, 0, 2 * Math.PI);
+                ctx.fillStyle = '#f7e3b2';
+                ctx.shadowColor = 'rgba(0,0,0,0.10)';
+                ctx.shadowBlur = 6;
+                ctx.fill();
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = '#a97b50';
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+                ctx.font = 'bold 28px serif';
+                ctx.fillStyle = '#3d2b1f';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('羊', node.x, node.y+2);
+                ctx.restore();
+            }
+        });
+    }
+
+    function drawHighlights() {
+        // Highlight selected piece
+        if (gameState.selectedPieceIndex !== -1) {
+            const node = nodes[gameState.selectedPieceIndex];
+            ctx.beginPath();
+            ctx.arc(node.x, node.y, PIECE_RADIUS + 2, 0, 2 * Math.PI);
+            ctx.fillStyle = HIGHLIGHT_COLOR;
+            ctx.fill();
+        }
+        // Highlight valid moves
+        gameState.validMoves.forEach(move => {
+            const node = nodes[move.to];
+            ctx.beginPath();
+            ctx.arc(node.x, node.y, PIECE_RADIUS, 0, 2 * Math.PI);
+            ctx.fillStyle = VALID_MOVE_COLOR;
+            ctx.fill();
+        });
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawBoard();
+        drawHighlights(); // Draw highlights under pieces
+        drawPieces();
+    }
+
+    function getNeighbors(nodeIndex) {
+        const neighbors = [];
+        connections.forEach(([start, end]) => {
+            if (start === nodeIndex) neighbors.push(end);
+            if (end === nodeIndex) neighbors.push(start);
+        });
+        return [...new Set(neighbors)]; // Return unique neighbors
+    }
+
+    function calculateValidMoves(pieceIndex) {
+        const pieceType = gameState.board[pieceIndex];
+        const moves = [];
+        const neighbors = getNeighbors(pieceIndex);
+
+        if (pieceType === 1) { // Sheep movement
+            neighbors.forEach(neighbor => {
+                if (gameState.board[neighbor] === 0) {
+                    moves.push({ to: neighbor, type: 'MOVE' });
+                }
+            });
+        } else if (pieceType === 2) { // Wolf movement
+            neighbors.forEach(neighbor => {
+                if (gameState.board[neighbor] === 0) {
+                    moves.push({ to: neighbor, type: 'MOVE' });
+                } else if (gameState.board[neighbor] === 1) {
+                    // Check for jump
+                    const jumpToNode = getJumpNode(pieceIndex, neighbor);
+                    if (jumpToNode !== -1 && gameState.board[jumpToNode] === 0) {
+                        moves.push({ to: jumpToNode, type: 'JUMP', jumped: neighbor });
+                    }
+                }
+            });
+        }
+        return moves;
+    }
+
+    function getJumpNode(fromNodeIndex, overNodeIndex) {
+        const fromNode = nodes[fromNodeIndex];
+        const overNode = nodes[overNodeIndex];
+        const dx = overNode.x - fromNode.x;
+        const dy = overNode.y - fromNode.y;
+        const targetX = overNode.x + dx;
+        const targetY = overNode.y + dy;
+
+        const targetNodeIndex = nodes.findIndex(n => n.x === targetX && n.y === targetY);
+
+        // Ensure the jump is along a valid connection line
+        if (targetNodeIndex !== -1) {
+             const overNeighbors = getNeighbors(overNodeIndex);
+             if(overNeighbors.includes(targetNodeIndex)){
+                 return targetNodeIndex;
+             }
+        }
+        return -1;
+    }
+
+    function checkWinConditions() {
+        // Wolf win condition
+        if (gameState.sheepEaten >= 11) { // 23 - 12 = 11 sheep eaten
+            gameState.gameOver = true;
+            gameState.winner = 'WOLF';
+            return;
+        }
+
+        // Sheep win condition
+        let wolfCanMove = false;
+        for (let i = 0; i < gameState.board.length; i++) {
+            if (gameState.board[i] === 2) {
+                if (calculateValidMoves(i).length > 0) {
+                    wolfCanMove = true;
+                    break;
+                }
+            }
+        }
+        if (!wolfCanMove) {
+            gameState.gameOver = true;
+            gameState.winner = 'SHEEP';
+        }
+    }
+
+    function updateStatus() {
+        // 信息栏显示剩下的羊和当前回合
+        let sheepLeft = gameState.sheepInHand + gameState.sheepOnBoard;
+        let turnText = gameState.turn === 'WOLF' ? '请狼走' : '请羊走';
+        infoBar.textContent = `未下的羊：${gameState.sheepInHand}  |  ${turnText}`;
+        // 原有状态栏保留胜负提示
+        if (gameState.gameOver) {
+            statusEl.textContent = gameState.winner === 'WOLF' ? '狼获胜！' : '羊获胜！';
+        } else {
+            statusEl.textContent = '';
+        }
+    }
+
+    function handleCanvasClick(event) {
+        if (gameState.gameOver) return;
+
+        const rect = canvas.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+
+        const clickedNodeIndex = nodes.findIndex(node =>
+            Math.sqrt((node.x - x) ** 2 + (node.y - y) ** 2) < CLICK_RADIUS
+        );
+
+        if (clickedNodeIndex === -1) return;
+
+        const { turn, phase } = gameState;
+
+        if (turn === 'SHEEP') {
+            if (phase === 'PLACEMENT') {
+                if (gameState.board[clickedNodeIndex] === 0) {
+                    gameState.board[clickedNodeIndex] = 1;
+                    gameState.sheepInHand--;
+                    gameState.sheepOnBoard++;
+                    if (gameState.sheepInHand === 0) {
+                        gameState.phase = 'MOVEMENT';
+                    }
+                    gameState.turn = 'WOLF';
+                    checkWinConditions();
+                }
+            } else { // MOVEMENT phase
+                handlePieceMovement(clickedNodeIndex, 1, 'WOLF');
+            }
+        } else if (turn === 'WOLF') {
+            handlePieceMovement(clickedNodeIndex, 2, 'SHEEP');
+        }
+
+        updateStatus();
+        draw();
+    }
+
+    function handlePieceMovement(clickedIndex, pieceType, nextTurn) {
+        // If a piece of the current player is clicked, select it
+        if (gameState.board[clickedIndex] === pieceType && gameState.selectedPieceIndex !== clickedIndex) {
+            gameState.selectedPieceIndex = clickedIndex;
+            gameState.validMoves = calculateValidMoves(clickedIndex);
+        }
+        // If a selected piece is clicked again, deselect it
+        else if (gameState.selectedPieceIndex === clickedIndex) {
+            gameState.selectedPieceIndex = -1;
+            gameState.validMoves = [];
+        }
+        // If a valid move destination is clicked
+        else if (gameState.selectedPieceIndex !== -1) {
+            const move = gameState.validMoves.find(m => m.to === clickedIndex);
+            if (move) {
+                // Execute move
+                gameState.board[move.to] = gameState.board[gameState.selectedPieceIndex];
+                gameState.board[gameState.selectedPieceIndex] = 0;
+
+                if (move.type === 'JUMP') {
+                    gameState.board[move.jumped] = 0; // Remove jumped sheep
+                    gameState.sheepEaten++;
+                    gameState.sheepOnBoard--;
+                }
+
+                // Reset selection and switch turn
+                gameState.selectedPieceIndex = -1;
+                gameState.validMoves = [];
+                gameState.turn = nextTurn;
+
+                // After the move, check for win conditions
+                if(nextTurn === 'WOLF'){
+                     checkWinConditions(); // Check if sheep trapped wolves
+                } else {
+                     // Check if wolves won or are trapped
+                     checkWinConditions();
+                }
+            }
+        }
+    }
+
+    // --- Event Listeners ---
+    canvas.addEventListener('click', handleCanvasClick);
+    restartBtn.addEventListener('click', setupNewGame);
+
+    // --- Initial Game Start ---
+    setupNewGame();
+    </script>
+</body>
+</html>
+
