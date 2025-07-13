@@ -191,7 +191,46 @@
         // 4x4大正方形主对角线
         [4, 10], [10, 16], [16, 22], [22, 28],[8,12],[12,16],[16,20],[20,24],[6,10],[10,14],[14,20],[20,26],[26,22],[22,18],[18,12],[12,6]
     ];
-    // 对角线将在下一步补充
+
+    // --- 预定义跳吃路线 ---
+    // 格式：[from, over, to] - 从from跳过over到to
+    const validJumpPaths = [
+        // 上方菱形的跳吃路线
+        [0, 33, 2], // 从顶点0的跳吃
+        [1, 33, 3], // 从左点1的跳吃
+        [2, 33, 0], // 从底点2的跳吃
+        [3, 33, 1], // 从右点3的跳吃
+        
+        // 下方菱形的跳吃路线
+        [29, 34, 31],  // 从顶点29的跳吃
+        [30, 34, 32],  // 从左点30的跳吃
+        [31, 34, 29],  // 从底点31的跳吃
+        [32, 34, 30],  // 从右点32的跳吃
+        
+        // 网格内的直线跳吃路线（横线）
+        [4, 5, 6], [5, 6, 7], [6, 7, 8],  // 第一行
+        [9, 10, 11], [10, 11, 12], [11, 12, 13],  // 第二行
+        [14, 15, 16], [15, 16, 17], [16, 17, 18],  // 第三行
+        [19, 20, 21], [20, 21, 22], [21, 22, 23],  // 第四行
+        [24, 25, 26], [25, 26, 27], [26, 27, 28],  // 第五行
+        
+        // 网格内的直线跳吃路线（竖线）
+        [4, 9, 14], [9, 14, 19], [14, 19, 24],  // 第一列
+        [5, 10, 15], [10, 15, 20], [15, 20, 25],  // 第二列
+        [6, 11, 16], [11, 16, 21], [16, 21, 26],  // 第三列
+        [7, 12, 17], [12, 17, 22], [17, 22, 27],  // 第四列
+        [8, 13, 18], [13, 18, 23], [18, 23, 28],  // 第五列
+        
+        // 对角线跳吃路线（主对角线）
+        [4, 10, 16], [10, 16, 22], [16, 22, 28],  // 左上到右下
+        [8, 12, 16], [12, 16, 20], [16, 20, 24],  // 右上到左下
+        [6, 10, 14], [14, 20, 26],  // 中间对角线
+        [6, 12, 18],  [18, 22, 26],  // 中间对角线
+        
+        // 等价节点的跳吃路线（2/6和26/29）
+        [1, 2, 12], [33, 2, 11], [3, 2, 10], [1, 6, 12], [33, 6, 11], [3, 6, 10],  // 2/6位置的跳吃
+        [20, 29, 32], [21, 29, 34], [23, 29, 30], [20, 26, 32], [21, 26, 34], [23, 26, 30] // 26/29位置的跳吃
+    ];
 
     // --- 游戏状态 ---
     let gameState = {};
@@ -252,7 +291,16 @@
                 ctx.save();
                 ctx.beginPath();
                 ctx.arc(node.x, node.y, 20, 0, 2 * Math.PI);
-                ctx.fillStyle = '#f7e3b2';
+                // 狼行动时，未选中为红色，选中为绿色
+                if (gameState.turn === 'WOLF') {
+                    if (gameState.selectedPieceIndex === wolfId) {
+                        ctx.fillStyle = '#4caf50'; // 绿色
+                    } else {
+                        ctx.fillStyle = '#e53935'; // 红色
+                    }
+                } else {
+                    ctx.fillStyle = '#f7e3b2'; // 默认色
+                }
                 ctx.shadowColor = 'rgba(0,0,0,0.10)';
                 ctx.shadowBlur = 6;
                 ctx.fill();
@@ -359,16 +407,11 @@
     function calculateValidMoves(pieceIndex) {
         const pieceType = gameState.board[pieceIndex];
         const moves = [];
-        // 合并重合点邻居
-        let neighbors = [];
-        getAllEquivalentIndices(pieceIndex).forEach(idx => {
-            neighbors = neighbors.concat(getNeighbors(idx));
-        });
+        // 只取自身节点的邻居
+        let neighbors = getNeighbors(pieceIndex);
         neighbors = [...new Set(neighbors)];
 
-        function isColinear(a, b, c) {
-            return (b.x - a.x) * (c.y - b.y) === (b.y - a.y) * (c.x - b.x);
-        }
+
 
         if (pieceType === 1) { // Sheep movement
             neighbors.forEach(neighbor => {
@@ -383,32 +426,25 @@
                 } else if (gameState.board[neighbor] === 1) {
                     // 检查跳吃：neighbor为over
                     const over = neighbor;
-                    let overNeighbors = [];
-                    getAllEquivalentIndices(over).forEach(idx => {
-                        overNeighbors = overNeighbors.concat(getNeighbors(idx));
-                    });
+                    let overNeighbors = getNeighbors(over);
                     overNeighbors = [...new Set(overNeighbors)];
                     overNeighbors.forEach(jumpTo => {
                         if (
                             jumpTo !== pieceIndex &&
                             gameState.board[jumpTo] === 0 &&
-                            // from->over、over->to都必须有连线，且to不能是from
-                            // 使用等价ID进行连接判定
-                            getAllEquivalentIndices(pieceIndex).some(eqFrom =>
-                                getAllEquivalentIndices(over).some(eqOver =>
-                                    connections.some(([a, b]) =>
-                                        (a === eqFrom && b === eqOver) || (a === eqOver && b === eqFrom)
-                                    )
-                                )
-                            ) &&
-                            getAllEquivalentIndices(over).some(eqOver =>
-                                getAllEquivalentIndices(jumpTo).some(eqTo =>
-                                    connections.some(([a, b]) =>
-                                        (a === eqOver && b === eqTo) || (a === eqTo && b === eqOver)
-                                    )
-                                )
-                            ) &&
-                            isColinear(nodes[pieceIndex], nodes[over], nodes[jumpTo])
+                            gameState.board[over] === 1 && // 只允许over本身有羊
+                            // 检查是否在预定义的跳吃路线中，允许from和to互换
+                            validJumpPaths.some(path => {
+                                const [a, b, c] = path;
+                                return (
+                                    (getAllEquivalentIndices(pieceIndex).includes(a) &&
+                                     over === b &&
+                                     getAllEquivalentIndices(jumpTo).includes(c)) ||
+                                    (getAllEquivalentIndices(jumpTo).includes(a) &&
+                                     over === b &&
+                                     getAllEquivalentIndices(pieceIndex).includes(c))
+                                );
+                            })
                         ) {
                             moves.push({ to: jumpTo, type: 'JUMP', jumped: over });
                         }
@@ -544,9 +580,13 @@
                 }
 
                 if (move.type === 'JUMP') {
-                    gameState.board[move.jumped] = 0; // Remove jumped sheep
-                    gameState.sheepEaten++;
-                    gameState.sheepOnBoard--;
+                    getAllEquivalentIndices(move.jumped).forEach(idx => {
+                        if (gameState.board[idx] === 1) {
+                            gameState.board[idx] = 0;
+                            gameState.sheepEaten++;
+                            gameState.sheepOnBoard--;
+                        }
+                    });
                 }
 
                 // Reset selection and switch turn
