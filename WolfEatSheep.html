@@ -51,11 +51,10 @@
         }
 
         canvas {
-            background-color: #fdfdfd;
-            border-radius: 8px;
-            border: 2px solid #c8b7a6;
-            max-width: 100%;
+            width: 100%;
+            max-width: 400px;
             height: auto;
+            display: block;
         }
 
         .controls {
@@ -235,6 +234,13 @@
         .close-rules-btn:hover {
             background: #c9a06c;
             color: #fff;
+        }
+        @media (max-width: 600px) {
+            .game-container { padding: 8px; border-radius: 8px; }
+            .bottom-bar { gap: 8px; }
+            .bottom-bar .btn { min-width: 70px; font-size: 0.95em; padding: 7px 8px; }
+            canvas { max-width: 98vw; width: 98vw; }
+            .rules-modal { width: 95vw; padding: 10px 2vw 8px 2vw; font-size: 0.98em; }
         }
     </style>
 </head>
