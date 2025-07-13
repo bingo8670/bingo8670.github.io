@@ -130,7 +130,7 @@
     const WOLF_COLOR = '#333333';
     const HIGHLIGHT_COLOR = 'rgba(255, 215, 0, 0.7)';
     const VALID_MOVE_COLOR = 'rgba(76, 175, 80, 0.7)';
-    const PIECE_RADIUS = 10;
+    const PIECE_RADIUS = 20;
     const CLICK_RADIUS = 15;
 
     // --- 棋盘节点和连接定义 ---
@@ -145,29 +145,34 @@
         { id: 2, x: 200, y: 120 },   // 底（与网格最上中点重合）
         { id: 3, x: 240, y: 80 },    // 右
 
-        // 主体4x4网格（5x5个交点）
-        // y从120到360，x从80到320，间隔60
+        // 主体4x4网格（5x5个交点，恢复id:6）
         { id: 4, x: 80,  y: 120 }, { id: 5, x: 140, y: 120 }, { id: 6, x: 200, y: 120 }, { id: 7, x: 260, y: 120 }, { id: 8, x: 320, y: 120 },
         { id: 9, x: 80,  y: 180 }, { id: 10, x: 140, y: 180 }, { id: 11, x: 200, y: 180 }, { id: 12, x: 260, y: 180 }, { id: 13, x: 320, y: 180 },
         { id: 14, x: 80,  y: 240 }, { id: 15, x: 140, y: 240 }, { id: 16, x: 200, y: 240 }, { id: 17, x: 260, y: 240 }, { id: 18, x: 320, y: 240 },
         { id: 19, x: 80,  y: 300 }, { id: 20, x: 140, y: 300 }, { id: 21, x: 200, y: 300 }, { id: 22, x: 260, y: 300 }, { id: 23, x: 320, y: 300 },
         { id: 24, x: 80,  y: 360 }, { id: 25, x: 140, y: 360 }, { id: 26, x: 200, y: 360 }, { id: 27, x: 260, y: 360 }, { id: 28, x: 320, y: 360 },
 
-        // 下方菱形
+        // 下方菱形（恢复id:29）
         { id: 29, x: 200, y: 360 },   // 顶点（与网格最下中点重合）
         { id: 30, x: 160, y: 400 },   // 左
         { id: 31, x: 200, y: 440 },   // 底
-        { id: 32, x: 240, y: 400 }    // 右
+        { id: 32, x: 240, y: 400 },   // 右
+        { id: 33, x: 200, y: 80 },    // 上菱形交叉点
+        { id: 34, x: 200, y: 400 }    // 下菱形交叉点
     ];
 
     const connections = [
         // 上方菱形的边和对角线
         [0, 1], [1, 2], [2, 3], [3, 0], // 四条边
         [0, 2], [1, 3],                 // 两条对角线
+        // 上方菱形交叉线
+        [0,33], [1,33], [2,33], [3,33],
 
         // 下方菱形的边和对角线
         [29, 30], [30, 31], [31, 32], [32, 29], // 四条边
         [29, 31], [30, 32],                     // 两条对角线
+        // 下方菱形交叉线
+        [29,34], [30,34], [31,34], [32,34],
 
         // 4x4网格横线（每行5个点，4条横线）
         [4,5],[5,6],[6,7],[7,8],
@@ -246,7 +251,7 @@
             if (wolfId !== undefined) {
                 ctx.save();
                 ctx.beginPath();
-                ctx.arc(node.x, node.y, 28, 0, 2 * Math.PI);
+                ctx.arc(node.x, node.y, 20, 0, 2 * Math.PI);
                 ctx.fillStyle = '#f7e3b2';
                 ctx.shadowColor = 'rgba(0,0,0,0.10)';
                 ctx.shadowBlur = 6;
@@ -255,7 +260,7 @@
                 ctx.strokeStyle = '#a97b50';
                 ctx.stroke();
                 ctx.shadowBlur = 0;
-                ctx.font = 'bold 28px serif';
+                ctx.font = 'bold 20px serif';
                 ctx.fillStyle = '#222';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
@@ -264,7 +269,7 @@
             } else if (sheepId !== undefined) {
                 ctx.save();
                 ctx.beginPath();
-                ctx.arc(node.x, node.y, 28, 0, 2 * Math.PI);
+                ctx.arc(node.x, node.y, 20, 0, 2 * Math.PI);
                 ctx.fillStyle = '#f7e3b2';
                 ctx.shadowColor = 'rgba(0,0,0,0.10)';
                 ctx.shadowBlur = 6;
@@ -273,7 +278,7 @@
                 ctx.strokeStyle = '#a97b50';
                 ctx.stroke();
                 ctx.shadowBlur = 0;
-                ctx.font = 'bold 28px serif';
+                ctx.font = 'bold 20px serif';
                 ctx.fillStyle = '#3d2b1f';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
@@ -310,18 +315,60 @@
     }
 
     function getNeighbors(nodeIndex) {
-        const neighbors = [];
+        let neighbors = [];
         connections.forEach(([start, end]) => {
             if (start === nodeIndex) neighbors.push(end);
             if (end === nodeIndex) neighbors.push(start);
         });
+        // 合并重合点邻居
+        if (nodeIndex === 2) {
+            connections.forEach(([start, end]) => {
+                if (start === 6) neighbors.push(end);
+                if (end === 6) neighbors.push(start);
+            });
+        }
+        if (nodeIndex === 6) {
+            connections.forEach(([start, end]) => {
+                if (start === 2) neighbors.push(end);
+                if (end === 2) neighbors.push(start);
+            });
+        }
+        if (nodeIndex === 26) {
+            connections.forEach(([start, end]) => {
+                if (start === 29) neighbors.push(end);
+                if (end === 29) neighbors.push(start);
+            });
+        }
+        if (nodeIndex === 29) {
+            connections.forEach(([start, end]) => {
+                if (start === 26) neighbors.push(end);
+                if (end === 26) neighbors.push(start);
+            });
+        }
         return [...new Set(neighbors)]; // Return unique neighbors
+    }
+
+    function getAllEquivalentIndices(idx) {
+        if (idx === 2) return [2, 6];
+        if (idx === 6) return [2, 6];
+        if (idx === 26) return [26, 29];
+        if (idx === 29) return [26, 29];
+        return [idx];
     }
 
     function calculateValidMoves(pieceIndex) {
         const pieceType = gameState.board[pieceIndex];
         const moves = [];
-        const neighbors = getNeighbors(pieceIndex);
+        // 合并重合点邻居
+        let neighbors = [];
+        getAllEquivalentIndices(pieceIndex).forEach(idx => {
+            neighbors = neighbors.concat(getNeighbors(idx));
+        });
+        neighbors = [...new Set(neighbors)];
+
+        function isColinear(a, b, c) {
+            return (b.x - a.x) * (c.y - b.y) === (b.y - a.y) * (c.x - b.x);
+        }
 
         if (pieceType === 1) { // Sheep movement
             neighbors.forEach(neighbor => {
@@ -334,11 +381,38 @@
                 if (gameState.board[neighbor] === 0) {
                     moves.push({ to: neighbor, type: 'MOVE' });
                 } else if (gameState.board[neighbor] === 1) {
-                    // Check for jump
-                    const jumpToNode = getJumpNode(pieceIndex, neighbor);
-                    if (jumpToNode !== -1 && gameState.board[jumpToNode] === 0) {
-                        moves.push({ to: jumpToNode, type: 'JUMP', jumped: neighbor });
-                    }
+                    // 检查跳吃：neighbor为over
+                    const over = neighbor;
+                    let overNeighbors = [];
+                    getAllEquivalentIndices(over).forEach(idx => {
+                        overNeighbors = overNeighbors.concat(getNeighbors(idx));
+                    });
+                    overNeighbors = [...new Set(overNeighbors)];
+                    overNeighbors.forEach(jumpTo => {
+                        if (
+                            jumpTo !== pieceIndex &&
+                            gameState.board[jumpTo] === 0 &&
+                            // from->over、over->to都必须有连线，且to不能是from
+                            // 使用等价ID进行连接判定
+                            getAllEquivalentIndices(pieceIndex).some(eqFrom =>
+                                getAllEquivalentIndices(over).some(eqOver =>
+                                    connections.some(([a, b]) =>
+                                        (a === eqFrom && b === eqOver) || (a === eqOver && b === eqFrom)
+                                    )
+                                )
+                            ) &&
+                            getAllEquivalentIndices(over).some(eqOver =>
+                                getAllEquivalentIndices(jumpTo).some(eqTo =>
+                                    connections.some(([a, b]) =>
+                                        (a === eqOver && b === eqTo) || (a === eqTo && b === eqOver)
+                                    )
+                                )
+                            ) &&
+                            isColinear(nodes[pieceIndex], nodes[over], nodes[jumpTo])
+                        ) {
+                            moves.push({ to: jumpTo, type: 'JUMP', jumped: over });
+                        }
+                    });
                 }
             });
         }
@@ -458,6 +532,16 @@
                 // Execute move
                 gameState.board[move.to] = gameState.board[gameState.selectedPieceIndex];
                 gameState.board[gameState.selectedPieceIndex] = 0;
+
+                // 清理等价节点：如果狼移动到等价节点，清理另一个等价节点
+                if (gameState.board[move.to] === 2) {
+                    const equivalentNodes = getAllEquivalentIndices(move.to);
+                    equivalentNodes.forEach(eqNode => {
+                        if (eqNode !== move.to && gameState.board[eqNode] === 2) {
+                            gameState.board[eqNode] = 0;
+                        }
+                    });
+                }
 
                 if (move.type === 'JUMP') {
                     gameState.board[move.jumped] = 0; // Remove jumped sheep
