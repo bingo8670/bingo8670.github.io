@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>扫雷游戏</title>
+    <style>
+        body {
+            background: #f0f0f0;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            min-height: 100vh;
+        }
+        h1 {
+            margin-top: 32px;
+            color: #4a4a4a;
+        }
+        .difficulty-select {
+            margin: 16px 0 24px 0;
+        }
+        .difficulty-select label {
+            margin-right: 18px;
+            font-size: 1.1em;
+        }
+        .board {
+            display: inline-block;
+            background: #bdbdbd;
+            border: 4px solid #888;
+            border-radius: 8px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+            margin-bottom: 24px;
+        }
+        .row {
+            display: flex;
+        }
+        .cell {
+            width: 32px;
+            height: 32px;
+            background: #e0e0e0;
+            border: 1.5px solid #aaa;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2em;
+            font-weight: bold;
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.1s;
+        }
+        .cell.open {
+            background: #fff;
+            border: 1.5px solid #bbb;
+            cursor: default;
+        }
+        .cell.flag {
+            background: #ffe082;
+            color: #d84315;
+        }
+        .cell.mine {
+            background: #ff5252;
+            color: #fff;
+        }
+        .cell.mine.open {
+            background: #d32f2f;
+        }
+        .info-bar {
+            font-size: 1.15em;
+            color: #333;
+            margin-bottom: 12px;
+        }
+        .restart-btn {
+            background: #4caf50;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1em;
+            font-weight: bold;
+            padding: 8px 24px;
+            cursor: pointer;
+            margin-bottom: 18px;
+            margin-left: 12px;
+        }
+        .restart-btn:hover {
+            background: #388e3c;
+        }
+        @media (max-width: 600px) {
+            .cell { width: 24px; height: 24px; font-size: 1em; }
+        }
+    </style>
+</head>
+<body>
+    <h1>扫雷 Minesweeper</h1>
+    <div class="difficulty-select">
+        <label><input type="radio" name="difficulty" value="easy" checked> 简单(9雷)</label>
+        <label><input type="radio" name="difficulty" value="normal"> 一般(19雷)</label>
+        <label><input type="radio" name="difficulty" value="hard"> 困难(49雷)</label>
+        <label><input type="radio" name="difficulty" value="hell"> 地狱(99雷)</label>
+        <button class="restart-btn" id="restartBtn">重新开始</button>
+    </div>
+    <div class="info-bar" id="infoBar"></div>
+    <div class="board" id="board"></div>
+    <script>
+        const DIFFICULTY = {
+            easy:   { rows: 9,  cols: 9,  mines: 9 },
+            normal: { rows: 12, cols: 12, mines: 19 },
+            hard:   { rows: 16, cols: 16, mines: 49 },
+            hell:   { rows: 20, cols: 20, mines: 99 }
+        };
+        let state = {};
+        let firstClick = true;
+
+        function shuffle(arr) {
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+        }
+
+        function initGame(difficulty) {
+            const { rows, cols, mines } = DIFFICULTY[difficulty];
+            state = {
+                rows, cols, mines,
+                board: [],
+                open: [],
+                flag: [],
+                gameOver: false,
+                win: false,
+                flagsUsed: 0,
+                cellsLeft: rows * cols - mines
+            };
+            for (let r = 0; r < rows; r++) {
+                state.board[r] = Array(cols).fill(0);
+                state.open[r] = Array(cols).fill(false);
+                state.flag[r] = Array(cols).fill(false);
+            }
+            firstClick = true;
+            render();
+            updateInfo();
+        }
+
+        function placeMines(safeR, safeC) {
+            const { rows, cols, mines } = state;
+            let cells = [];
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    // 第一点击的格子和周围8格都不能有雷
+                    if (Math.abs(r - safeR) <= 1 && Math.abs(c - safeC) <= 1) continue;
+                    cells.push([r, c]);
+                }
+            }
+            shuffle(cells);
+            for (let i = 0; i < mines; i++) {
+                const [r, c] = cells[i];
+                state.board[r][c] = 'M';
+            }
+            // 计算数字
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    if (state.board[r][c] === 'M') continue;
+                    let cnt = 0;
+                    for (let dr = -1; dr <= 1; dr++) {
+                        for (let dc = -1; dc <= 1; dc++) {
+                            if (dr === 0 && dc === 0) continue;
+                            let nr = r + dr, nc = c + dc;
+                            if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && state.board[nr][nc] === 'M') cnt++;
+                        }
+                    }
+                    state.board[r][c] = cnt;
+                }
+            }
+        }
+
+        function openCell(r, c) {
+            if (state.open[r][c] || state.flag[r][c] || state.gameOver) return;
+            state.open[r][c] = true;
+            if (state.board[r][c] === 'M') {
+                state.gameOver = true;
+                state.win = false;
+                revealAll();
+                updateInfo();
+                render();
+                return;
+            }
+            state.cellsLeft--;
+            if (state.board[r][c] === 0) {
+                for (let dr = -1; dr <= 1; dr++) {
+                    for (let dc = -1; dc <= 1; dc++) {
+                        if (dr === 0 && dc === 0) continue;
+                        let nr = r + dr, nc = c + dc;
+                        if (nr >= 0 && nr < state.rows && nc >= 0 && nc < state.cols) {
+                            openCell(nr, nc);
+                        }
+                    }
+                }
+            }
+            if (state.cellsLeft === 0) {
+                state.gameOver = true;
+                state.win = true;
+                revealAll();
+            }
+            updateInfo();
+            render();
+        }
+
+        function revealAll() {
+            for (let r = 0; r < state.rows; r++) {
+                for (let c = 0; c < state.cols; c++) {
+                    state.open[r][c] = true;
+                }
+            }
+        }
+
+        function toggleFlag(r, c) {
+            if (state.open[r][c] || state.gameOver) return;
+            state.flag[r][c] = !state.flag[r][c];
+            state.flagsUsed += state.flag[r][c] ? 1 : -1;
+            updateInfo();
+            render();
+        }
+
+        function updateInfo() {
+            if (state.gameOver) {
+                infoBar.textContent = state.win ? '恭喜你，扫雷成功！' : '游戏失败，踩到雷了！';
+            } else {
+                infoBar.textContent = `剩余雷数：${state.mines - state.flagsUsed}`;
+            }
+        }
+
+        function openSurroundingIfSafe(r, c) {
+            if (!state.open[r][c] || typeof state.board[r][c] !== 'number') return;
+            let flagCount = 0;
+            let unopened = [];
+            for (let dr = -1; dr <= 1; dr++) {
+                for (let dc = -1; dc <= 1; dc++) {
+                    if (dr === 0 && dc === 0) continue;
+                    let nr = r + dr, nc = c + dc;
+                    if (nr >= 0 && nr < state.rows && nc >= 0 && nc < state.cols) {
+                        if (state.flag[nr][nc]) flagCount++;
+                        else if (!state.open[nr][nc]) unopened.push([nr, nc]);
+                    }
+                }
+            }
+            if (flagCount === state.board[r][c]) {
+                unopened.forEach(([nr, nc]) => openCell(nr, nc));
+            } else if (unopened.length > 0 && unopened.length === state.board[r][c] - flagCount) {
+                // 新增：如果未打开未插旗格数等于数字-旗子数，自动插旗
+                unopened.forEach(([nr, nc]) => {
+                    if (!state.flag[nr][nc]) {
+                        state.flag[nr][nc] = true;
+                        state.flagsUsed++;
+                    }
+                });
+                updateInfo();
+                render();
+            }
+        }
+
+        function render() {
+            const boardDiv = document.getElementById('board');
+            boardDiv.innerHTML = '';
+            for (let r = 0; r < state.rows; r++) {
+                const rowDiv = document.createElement('div');
+                rowDiv.className = 'row';
+                for (let c = 0; c < state.cols; c++) {
+                    const cellDiv = document.createElement('div');
+                    cellDiv.className = 'cell';
+                    if (state.open[r][c]) cellDiv.classList.add('open');
+                    if (state.flag[r][c]) cellDiv.classList.add('flag');
+                    if (state.open[r][c] && state.board[r][c] === 'M') cellDiv.classList.add('mine');
+                    if (state.open[r][c]) {
+                        if (state.board[r][c] === 'M') {
+                            cellDiv.textContent = '💣';
+                        } else if (state.board[r][c] > 0) {
+                            cellDiv.textContent = state.board[r][c];
+                            cellDiv.style.color = ['#1976d2','#388e3c','#d32f2f','#7b1fa2','#fbc02d','#5d4037','#0288d1','#c2185b'][state.board[r][c]-1];
+                        }
+                    } else if (state.flag[r][c]) {
+                        cellDiv.textContent = '🚩';
+                    }
+                    cellDiv.onmousedown = function(e) {
+                        if (state.gameOver) return;
+                        if (e.button === 0) {
+                            if (firstClick) {
+                                placeMines(r, c);
+                                firstClick = false;
+                            }
+                            openCell(r, c);
+                        } else if (e.button === 2) {
+                            toggleFlag(r, c);
+                        }
+                    };
+                    cellDiv.oncontextmenu = function(e) { e.preventDefault(); };
+                    // 新增：双击数字格自动开周围
+                    cellDiv.ondblclick = function(e) {
+                        if (state.gameOver) return;
+                        openSurroundingIfSafe(r, c);
+                    };
+                    rowDiv.appendChild(cellDiv);
+                }
+                boardDiv.appendChild(rowDiv);
+            }
+        }
+
+        // 难度切换
+        document.querySelectorAll('input[name="difficulty"]').forEach(radio => {
+            radio.onchange = function() {
+                if (this.checked) initGame(this.value);
+            };
+        });
+        document.getElementById('restartBtn').onclick = function() {
+            const diff = document.querySelector('input[name="difficulty"]:checked').value;
+            initGame(diff);
+        };
+
+        // 初始化
+        window.onload = function() {
+            initGame('easy');
+        };
+    </script>
+</body>
+</html> 

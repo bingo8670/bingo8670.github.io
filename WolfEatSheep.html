@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>狼吃羊</title>
+    <title>狼吃羊1</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
@@ -48,8 +48,15 @@
             border-radius: 12px;
             box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
             max-width: 100%;
+            margin-bottom: 20px;
         }
-
+        .controls-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 500px;
+        }
         canvas {
             width: 100%;
             max-width: 400px;
@@ -247,15 +254,15 @@
 <body>
     <div class="game-container">
         <canvas id="game-board" width="400" height="570"></canvas>
-        <div class="controls">
-            <div class="bottom-bar">
-                <div class="info" id="info-bar"></div>
-                <button class="btn" id="restart-button">重新开始</button>
-                <button class="btn" id="show-rules-btn">游戏规则</button>
-                <button class="btn" id="back-menu-btn">返回主菜单</button>
-            </div>
-            <div id="status"></div>
+    </div>
+    <div class="controls-container">
+        <div class="bottom-bar">
+            <div class="info" id="info-bar"></div>
+            <button class="btn" id="restart-button">重新开始</button>
+            <button class="btn" id="show-rules-btn">游戏规则</button>
+            <button class="btn" id="back-menu-btn">返回主菜单</button>
         </div>
+        <div id="status"></div>
     </div>
     <div class="rules-modal-mask" id="rules-mask"></div>
     <div class="rules-modal" id="rules-modal">
@@ -381,7 +388,7 @@
         
         // 等价节点的跳吃路线（2/6和26/29）
         [1, 2, 12], [33, 2, 11], [3, 2, 10], [1, 6, 12], [33, 6, 11], [3, 6, 10],  // 2/6位置的跳吃
-        [20, 29, 32], [21, 29, 34], [23, 29, 30], [20, 26, 32], [21, 26, 34], [23, 26, 30] // 26/29位置的跳吃
+        [20, 29, 32], [21, 29, 34],[22,29,30], [20, 26, 32], [21, 26, 34],[22,26,30] // 26/29位置的跳吃
     ];
 
     // --- 游戏状态 ---
@@ -569,7 +576,6 @@
         });
         neighbors = [...new Set(neighbors)];
 
-
         if (pieceType === 1) { // Sheep movement
             neighbors.forEach(neighbor => {
                 if (gameState.board[neighbor] === 0) {
@@ -577,8 +583,10 @@
                 }
             });
         } else if (pieceType === 2) { // Wolf movement
+            console.log(`检查狼在位置${pieceIndex}的移动路线...`);
             neighbors.forEach(neighbor => {
                 if (gameState.board[neighbor] === 0) {
+                    console.log(`狼可以从${pieceIndex}移动到${neighbor}`);
                     moves.push({ to: neighbor, type: 'MOVE' });
                 } else if (gameState.board[neighbor] === 1) {
                     // 检查跳吃：neighbor为over
@@ -586,41 +594,76 @@
                     let overNeighbors = getNeighbors(over);
                     overNeighbors = [...new Set(overNeighbors)];
                     overNeighbors.forEach(jumpTo => {
-                        const isValidJump = (
+                        // 检查是否是通过重合点进行的不合理跳吃
+                        const isInvalidJump = (
+                            (getAllEquivalentIndices(pieceIndex).includes(2) || getAllEquivalentIndices(pieceIndex).includes(6)) &&
+                            over === 7 && 
+                            (getAllEquivalentIndices(jumpTo).includes(2) || getAllEquivalentIndices(jumpTo).includes(6))
+                        ) || (
+                            (getAllEquivalentIndices(pieceIndex).includes(26) || getAllEquivalentIndices(pieceIndex).includes(29)) &&
+                            over === 27 && 
+                            (getAllEquivalentIndices(jumpTo).includes(26) || getAllEquivalentIndices(jumpTo).includes(29))
+                        );
+                        
+                        // 首先检查基本跳吃条件
+                        const basicJumpValid = (
                             jumpTo !== pieceIndex &&
                             gameState.board[jumpTo] === 0 &&
                             gameState.board[over] === 1 &&
-                            validJumpPaths.some(path => {
-                                const [a, b, c] = path;
-                                return (
-                                    (getAllEquivalentIndices(pieceIndex).includes(a) &&
-                                     over === b &&
-                                     getAllEquivalentIndices(jumpTo).includes(c)) ||
-                                    (getAllEquivalentIndices(jumpTo).includes(a) &&
-                                     over === b &&
-                                     getAllEquivalentIndices(pieceIndex).includes(c))
-                                );
-                            })
+                            !isInvalidJump
                         );
-                        // 调试输出
-                        if (gameState.turn === 'WOLF') {
-                            console.log('[跳吃判定]', {
-                                from: pieceIndex,
+                        
+                        // 然后检查是否在预定义的跳吃路径中
+                        const pathValid = validJumpPaths.some(path => {
+                            const [a, b, c] = path;
+                            const condition1 = getAllEquivalentIndices(pieceIndex).includes(a) && over === b && getAllEquivalentIndices(jumpTo).includes(c);
+                            const condition2 = getAllEquivalentIndices(jumpTo).includes(a) && over === b && getAllEquivalentIndices(pieceIndex).includes(c);
+                            console.log(`[路径验证] 路径[${a},${b},${c}]:`, {
+                                pieceIndex,
                                 over,
-                                to: jumpTo,
-                                fromNeighbors: getNeighbors(pieceIndex),
-                                overNeighbors: overNeighbors,
-                                board: [...gameState.board],
-                                valid: isValidJump
+                                jumpTo,
+                                eqFrom: getAllEquivalentIndices(pieceIndex),
+                                eqTo: getAllEquivalentIndices(jumpTo),
+                                condition1,
+                                condition2,
+                                result: condition1 || condition2
                             });
-                        }
+                            return condition1 || condition2;
+                        });
+                        
+                        const isValidJump = basicJumpValid && pathValid;
+                        
+                        console.log(`[跳吃基本条件] 从${pieceIndex}跳过${over}到${jumpTo}:`, {
+                            basicJumpValid,
+                            pathValid,
+                            finalValid: isValidJump,
+                            overPiece: gameState.board[over],
+                            toPiece: gameState.board[jumpTo],
+                            overIsSheep: gameState.board[over] === 1,
+                            toIsEmpty: gameState.board[jumpTo] === 0,
+                            notSamePosition: jumpTo !== pieceIndex,
+                            notInvalidJump: !isInvalidJump
+                        });
+                        // 调试输出 - 始终显示
+                        console.log('[跳吃判定]', {
+                            from: pieceIndex,
+                            over,
+                            to: jumpTo,
+                            fromNeighbors: getNeighbors(pieceIndex),
+                            overNeighbors: overNeighbors,
+                            board: [...gameState.board],
+                            valid: isValidJump,
+                            invalidReason: isInvalidJump ? '通过重合点不合理跳吃' : '正常'
+                        });
                         if (isValidJump) {
+                            console.log(`狼可以从${pieceIndex}跳过${over}到${jumpTo}`);
                             moves.push({ to: jumpTo, type: 'JUMP', jumped: over });
                         }
                     });
                 }
             });
         }
+        console.log(`位置${pieceIndex}的总可走路线:`, moves);
         return moves;
     }
 
@@ -652,19 +695,11 @@
             return;
         }
 
-        // Sheep win condition
-        let wolfCanMove = false;
-        for (let i = 0; i < gameState.board.length; i++) {
-            if (gameState.board[i] === 2) {
-                if (calculateValidMoves(i).length > 0) {
-                    wolfCanMove = true;
-                    break;
-                }
-            }
-        }
-        if (!wolfCanMove) {
+        // Sheep win condition - 狼无路可走
+        if (!checkWolfCanMove()) {
             gameState.gameOver = true;
             gameState.winner = 'SHEEP';
+            return;
         }
     }
 
@@ -682,13 +717,29 @@
     }
 
     function checkWolfCanMove() {
+        console.log('检查狼是否有路可走...');
+        let wolfPositions = [];
+        
+        // 找到所有狼的位置
         for (let i = 0; i < gameState.board.length; i++) {
             if (gameState.board[i] === 2) {
-                if (calculateValidMoves(i).length > 0) {
-                    return true;
-                }
+                wolfPositions.push(i);
             }
         }
+        
+        console.log('狼的位置:', wolfPositions);
+        
+        // 检查每只狼是否有路可走
+        for (let wolfPos of wolfPositions) {
+            const moves = calculateValidMoves(wolfPos);
+            console.log(`狼在位置${wolfPos}的可走路线:`, moves);
+            if (moves.length > 0) {
+                console.log('狼有路可走');
+                return true;
+            }
+        }
+        
+        console.log('所有狼都无路可走！');
         return false;
     }
 
@@ -696,8 +747,10 @@
         if (gameState.gameOver) return;
 
         const rect = canvas.getBoundingClientRect();
-        const x = event.clientX - rect.left;
-        const y = event.clientY - rect.top;
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        const x = (event.clientX - rect.left) * scaleX;
+        const y = (event.clientY - rect.top) * scaleY;
 
         const clickedNodeIndex = nodes.findIndex(node =>
             Math.sqrt((node.x - x) ** 2 + (node.y - y) ** 2) < CLICK_RADIUS
@@ -720,6 +773,12 @@
                         gameState.phase = 'MOVEMENT';
                     }
                     gameState.turn = 'WOLF';
+                    // 强制检查狼是否有路可走
+                    if (!checkWolfCanMove()) {
+                        gameState.gameOver = true;
+                        gameState.winner = 'SHEEP';
+                        console.log('游戏结束：狼无路可走，羊获胜！');
+                    }
                     checkWinConditions();
                 }
             } else { // MOVEMENT phase
@@ -735,10 +794,11 @@
                 }
             }
         } else if (turn === 'WOLF') {
-            // 新增：狼无路可走直接判负
+            // 强制检查狼是否有路可走
             if (!checkWolfCanMove()) {
                 gameState.gameOver = true;
                 gameState.winner = 'SHEEP';
+                console.log('游戏结束：狼无路可走，羊获胜！');
                 updateStatus();
                 draw();
                 return;
@@ -824,6 +884,8 @@
             }
         }
     }
+
+
 
     // --- Event Listeners ---
     canvas.addEventListener('click', handleCanvasClick);
