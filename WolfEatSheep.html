@@ -66,13 +66,18 @@
         canvas {
             /* 实际显示尺寸由 JS 的 fitCanvas() 计算写入 style，避免 CSS 缩放导致错位 */
             display: block;
-            touch-action: manipulation;
+            /* 关闭浏览器手势：禁止双指缩放与滚动，让棋盘只响应点击。
+               manipulation 允许平移缩放，none 会完全锁定，更适合棋盘类交互。 */
+            touch-action: none;
+            -ms-touch-action: none;
             /* 禁用移动端点击时的系统高亮方块：
                该方块出现在手指点击处，易被误认为"可走位置"提示 */
             -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
             -webkit-touch-callout: none;
             user-select: none;
             -webkit-user-select: none;
+            /* 防止 iOS 长按选中/放大镜干扰点击 */
+            -webkit-touch-adjustment: none;
         }
 
         .controls {
@@ -313,6 +318,9 @@
     const VALID_MOVE_COLOR = 'rgba(76, 175, 80, 0.7)';
     const PIECE_RADIUS = 20;
     const CLICK_RADIUS = 15;
+    // 触摸命中半径：手机上棋子显示更小、手指精度更差，适当放宽避免点击落空。
+    // 斜向误触最远约 1.41*R，故取32 逻辑单位覆盖约 22px 的屏幕偏移。
+    const TOUCH_CLICK_RADIUS = 32;
 
     // --- 画布自适应 ---
     // 棋盘逻辑坐标固定为 400 x 570，显示尺寸按可用空间等比缩放，
@@ -794,9 +802,21 @@
         // 原有状态栏保留胜负提示
         if (gameState.gameOver) {
             statusEl.textContent = gameState.winner === 'WOLF' ? '狼获胜！' : '羊获胜！';
-        } else {
+        } else if (!hintTimer) {
             statusEl.textContent = '';
         }
+    }
+
+    // 临时操作提示：约1.6 秒后自动清除，且不覆盖胜负信息
+    let hintTimer = null;
+    function setStatus(msg) {
+        if (gameState.gameOver) return;
+        statusEl.textContent = msg;
+        clearTimeout(hintTimer);
+        hintTimer = setTimeout(() => {
+            hintTimer = null;
+            if (!gameState.gameOver) statusEl.textContent = '';
+        }, 1600);
     }
 
     function checkWolfCanMove() {
@@ -829,17 +849,51 @@
 
         const rect = canvas.getBoundingClientRect();
         if (!rect.width || !rect.height) return;
+
+        // 取指针坐标：部分安卓浏览器 touchend 的 clientX/Y 为 0，
+        // 需回退到 changedTouches / targetTouches，否则会点偏
+        let clientX = event.clientX, clientY = event.clientY;
+        if ((!clientX && !clientY) && event.changedTouches && event.changedTouches.length) {
+            clientX = event.changedTouches[0].clientX;
+            clientY = event.changedTouches[0].clientY;
+        }
+
         // canvas.width 已按 devicePixelRatio 放大，此处换算回逻辑坐标
         const scaleX = canvas.width / rect.width;
         const scaleY = canvas.height / rect.height;
-        const x = (event.clientX - rect.left) * scaleX;
-        const y = (event.clientY - rect.top) * scaleY;
+        const x = (clientX - rect.left) * scaleX;
+        const y = (clientY - rect.top) * scaleY;
 
-        const clickedNodeIndex = nodes.findIndex(node =>
-            Math.sqrt((node.x - x) ** 2 + (node.y - y) ** 2) < CLICK_RADIUS
-        );
+        // 命中判定：两级策略
+        // 1) 严格半径内取最近节点 —— 与鼠标行为一致，保证精确点击不受影响
+        // 2) 落空时（手指有抖动）放宽到 TOUCH 半径，并在候选中优先取"有棋子"的节点，
+        //    因为玩家是照着看得见的棋子点的；若附近无棋子，则取最近的空点
+        const isTouch = event.type !== 'mousedown' && event.type !== 'click';
+        const hitRadius = isTouch ? TOUCH_CLICK_RADIUS : CLICK_RADIUS;
 
-        if (clickedNodeIndex === -1) return;
+        let clickedNodeIndex = -1;
+        let bestDist = Infinity;
+        for (let i = 0; i < nodes.length; i++) {
+            const d = Math.hypot(nodes[i].x - x, nodes[i].y - y);
+            if (d < bestDist) { bestDist = d; clickedNodeIndex = i; }
+        }
+
+        // 未落在严格半径内，且为触摸操作时，放宽并优先命中棋子
+        if (bestDist > CLICK_RADIUS && isTouch) {
+            let bestOccupied = -1, bestOccupiedDist = Infinity;
+            for (let i = 0; i < nodes.length; i++) {
+                const d = Math.hypot(nodes[i].x - x, nodes[i].y - y);
+                if (d > TOUCH_CLICK_RADIUS) continue;
+                if (pieceAt(i) !== 0 && d < bestOccupiedDist) {
+                    bestOccupiedDist = d; bestOccupied = i;
+                }
+            }
+            clickedNodeIndex = bestOccupied !== -1 ? bestOccupied : clickedNodeIndex;
+            bestDist = bestOccupied !== -1 ? bestOccupiedDist : bestDist;
+            if (bestDist > TOUCH_CLICK_RADIUS) clickedNodeIndex = -1;
+        }
+
+        if (clickedNodeIndex === -1 || bestDist > hitRadius) return;
 
         const { turn, phase } = gameState;
 
@@ -862,6 +916,11 @@
                         gameState.winner = 'SHEEP';
                     }
                     checkWinConditions();
+                } else if (pieceAt(clickedNodeIndex) === 2) {
+                    // 放羊阶段点了狼：提示不能在此落子，避免"点了没反应"的困惑
+                    setStatus('狼的位置不能放羊，请点空位');
+                } else {
+                    setStatus('该位置已有羊，请点空位放羊');
                 }
             } else { // MOVEMENT phase
                 if (
@@ -949,12 +1008,32 @@
 
 
     // --- Event Listeners ---
-    // pointerdown 统一处理鼠标与触摸，移动端无 300ms 延迟，点击位置也更精确
+    // 移动端点击处理要点：
+    // 1) 优先用 pointerdown（现代浏览器），无 300ms 延迟
+    // 2) 旧版 iOS 无 PointerEvent 时回退到 touchend 而非 touchstart——
+    //    touchstart 后页面可能滚动导致点击落空，touchend 更可靠
+    // 3) 统一屏蔽后续合成的 mouse 事件，避免同一次点击被处理两次
+    //    （否则会"选中后立刻取消选中"，表现为点击没反应）
+    let lastTouchTime = 0;
+    function markTouch(e) {
+        lastTouchTime = Date.now();
+        if (e.cancelable) e.preventDefault();
+    }
+    function shouldIgnoreMouse() {
+        return Date.now() - lastTouchTime < 700;
+    }
+
     if (window.PointerEvent) {
-        canvas.addEventListener('pointerdown', handleCanvasClick);
+        canvas.addEventListener('pointerdown', e => {
+            markTouch(e);
+            handleCanvasClick(e);
+        });
     } else {
-        canvas.addEventListener('touchstart', handleCanvasClick, { passive: true });
-        canvas.addEventListener('mousedown', handleCanvasClick);
+        canvas.addEventListener('touchend', handleCanvasClick, { passive: false });
+        canvas.addEventListener('mousedown', e => {
+            if (shouldIgnoreMouse()) return;
+            handleCanvasClick(e);
+        });
     }
     canvas.addEventListener('contextmenu', e => e.preventDefault());
     restartBtn.addEventListener('click', setupNewGame);
