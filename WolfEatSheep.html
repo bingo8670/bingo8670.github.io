@@ -10,13 +10,16 @@
             background-color: #f0e6d2;
             color: #4a4a4a;
             display: flex;
-            justify-content: center;
+            justify-content: flex-start;
             align-items: center;
-            height: 100vh;
-            margin: 0;
             flex-direction: column;
+            /* 用 min-height 而非 height，内容超高时页面可正常滚动，不会被裁掉顶部 */
+            min-height: 100vh;
+            min-height: 100dvh;
+            margin: 0;
             padding: 10px;
             box-sizing: border-box;
+            overflow-x: hidden;
         }
         .main-flex, .side-bar { display: none; }
         .bottom-bar {
@@ -44,11 +47,13 @@
             flex-direction: column;
             align-items: center;
             background: #fff;
-            padding: 20px;
+            padding: 12px;
             border-radius: 12px;
             box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
-            max-width: 100%;
-            margin-bottom: 20px;
+            width: 100%;
+            max-width: 424px;
+            box-sizing: border-box;
+            margin-bottom: 12px;
         }
         .controls-container {
             display: flex;
@@ -56,12 +61,18 @@
             align-items: center;
             width: 100%;
             max-width: 500px;
+            box-sizing: border-box;
         }
         canvas {
-            width: 100%;
-            max-width: 400px;
-            height: auto;
+            /* 实际显示尺寸由 JS 的 fitCanvas() 计算写入 style，避免 CSS 缩放导致错位 */
             display: block;
+            touch-action: manipulation;
+            /* 禁用移动端点击时的系统高亮方块：
+               该方块出现在手指点击处，易被误认为"可走位置"提示 */
+            -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+            -webkit-touch-callout: none;
+            user-select: none;
+            -webkit-user-select: none;
         }
 
         .controls {
@@ -117,6 +128,8 @@
             min-width: 100px;
             text-align: center;
             display: inline-block;
+            -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+            touch-action: manipulation;
         }
         .btn:hover {
             background: #c9a06c;
@@ -243,11 +256,19 @@
             color: #fff;
         }
         @media (max-width: 600px) {
-            .game-container { padding: 8px; border-radius: 8px; }
-            .bottom-bar { gap: 8px; }
-            .bottom-bar .btn { min-width: 70px; font-size: 0.95em; padding: 7px 8px; }
-            canvas { max-width: 98vw; width: 98vw; }
-            .rules-modal { width: 95vw; padding: 10px 2vw 8px 2vw; font-size: 0.98em; }
+            .game-container { padding: 8px; border-radius: 8px; margin-bottom: 10px; }
+            .bottom-bar { gap: 8px; flex-wrap: wrap; }
+            .bottom-bar .info { width: 100%; text-align: center; font-size: 1.05em; }
+            .bottom-bar .btn { min-width: 64px; font-size: 0.9em; padding: 8px 6px; }
+            .rules-modal { width: 95vw; max-width: 95vw; padding: 14px 16px 10px 16px; font-size: 0.95em; }
+            .rules-modal ul, .game-rules ul { margin-left: 1em; }
+        }
+        /* 短屏（横屏手机）：进一步压缩留白，保证棋盘完整可见 */
+        @media (max-height: 480px) and (orientation: landscape) {
+            .game-container { padding: 6px; margin-bottom: 6px; }
+            .bottom-bar { margin-bottom: 4px; gap: 6px; }
+            .btn, .bottom-bar .btn { padding: 6px 10px; font-size: 0.85em; }
+            #status { font-size: 1em; min-height: 18px; margin-bottom: 6px; }
         }
     </style>
 </head>
@@ -293,6 +314,53 @@
     const PIECE_RADIUS = 20;
     const CLICK_RADIUS = 15;
 
+    // --- 画布自适应 ---
+    // 棋盘逻辑坐标固定为 400 x 570，显示尺寸按可用空间等比缩放，
+    // 内部缓冲区按 devicePixelRatio 放大，保证手机屏幕上不模糊、不错位。
+    const LOGIC_W = 400;
+    const LOGIC_H = 570;
+
+    function fitCanvas() {
+        const container = canvas.parentElement;
+        const styles = getComputedStyle(container);
+        const padX = parseFloat(styles.paddingLeft) + parseFloat(styles.paddingRight);
+        const padY = parseFloat(styles.paddingTop) + parseFloat(styles.paddingBottom);
+
+        // 可用宽度只依据视口计算，不读取容器宽度，
+        // 否则容器被写死宽度后再次测量会读到自身收窄的值，导致逐次缩小。
+        const bodyStyles = getComputedStyle(document.body);
+        const pageAvailW = window.innerWidth
+            - parseFloat(bodyStyles.paddingLeft) - parseFloat(bodyStyles.paddingRight);
+
+        // 竖向可用空间 = 视口高 - 底部操作区 - 容器外边距 - 安全留白
+        const controlsH = document.querySelector('.controls-container').offsetHeight;
+        const containerMargin = parseFloat(getComputedStyle(container).marginBottom) || 0;
+        const availH = window.innerHeight - controlsH - containerMargin - padY - 24;
+
+        const scale = Math.max(
+            0.3,
+            Math.min(pageAvailW - padX, LOGIC_W, Math.max(availH, 240)) / LOGIC_W
+        );
+        const cssW = Math.floor(LOGIC_W * scale);
+        const cssH = Math.floor(LOGIC_H * scale);
+
+        canvas.style.width = cssW + 'px';
+        canvas.style.height = cssH + 'px';
+        // 容器宽度贴合画布，避免内部出现多余留白
+        container.style.width = (cssW + padX) + 'px';
+        container.style.maxWidth = 'none';
+
+        const dpr = Math.min(window.devicePixelRatio || 1, 3);
+        const bufW = Math.round(LOGIC_W * dpr);
+        const bufH = Math.round(LOGIC_H * dpr);
+        if (canvas.width !== bufW || canvas.height !== bufH) {
+            canvas.width = bufW;
+            canvas.height = bufH;
+            // 重设缓冲后变换矩阵会重置，必须重新应用缩放
+        }
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+
     // --- 棋盘节点和连接定义 ---
     // 画布宽400, 高570
     // 上方菱形顶点y=60，底部y=120
@@ -324,13 +392,12 @@
     const connections = [
         // 上方菱形的边和对角线
         [0, 1], [1, 2], [2, 3], [3, 0], // 四条边
-        
-        // 上方菱形交叉线
+        // 菱形中心连线：中心(33)是真实棋位，狼可跳过它吃对角线另一端的羊
         [0,33], [1,33], [2,33], [3,33],
 
         // 下方菱形的边和对角线
         [29, 30], [30, 31], [31, 32], [32, 29], // 四条边
-        // 下方菱形交叉线
+        // 下方菱形中心连线：中心(34)是真实棋位
         [29,34], [30,34], [31,34], [32,34],
 
         // 4x4网格横线（每行5个点，4条横线）
@@ -354,13 +421,13 @@
     // --- 预定义跳吃路线 ---
     // 格式：[from, over, to] - 从from跳过over到to
     const validJumpPaths = [
-        // 上方菱形的跳吃路线
+        // 上方菱形的跳吃路线（经中心33）
         [0, 33, 2], // 从顶点0的跳吃
         [1, 33, 3], // 从左点1的跳吃
         [2, 33, 0], // 从底点2的跳吃
         [3, 33, 1], // 从右点3的跳吃
-        
-        // 下方菱形的跳吃路线
+
+        // 下方菱形的跳吃路线（经中心34）
         [29, 34, 31],  // 从顶点29的跳吃
         [30, 34, 32],  // 从左点30的跳吃
         [31, 34, 29],  // 从底点31的跳吃
@@ -388,7 +455,7 @@
         
         // 等价节点的跳吃路线（2/6和26/29）
         [1, 2, 12], [33, 2, 11], [3, 2, 10], [1, 6, 12], [33, 6, 11], [3, 6, 10],  // 2/6位置的跳吃
-        [20, 29, 32], [21, 29, 34],[22,29,30], [20, 26, 32], [21, 26, 34],[22,26,30] // 26/29位置的跳吃
+        [20, 29, 32], [21, 29, 34], [22,29,30], [20, 26, 32], [21, 26, 34], [22,26,30] // 26/29位置的跳吃
     ];
 
     // --- 游戏状态 ---
@@ -454,7 +521,7 @@
                 if (gameState.turn === 'WOLF') {
                     if (
                         wolfId !== undefined &&
-                        getAllEquivalentIndices(wolfId).includes(gameState.selectedPieceIndex)
+                        equivalentsOf(wolfId).includes(gameState.selectedPieceIndex)
                     ) {
                         ctx.fillStyle = '#4caf50'; // 绿色
                     } else {
@@ -518,152 +585,168 @@
     }
 
     function draw() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.clearRect(0, 0, LOGIC_W, LOGIC_H);
         drawBoard();
         drawHighlights(); // Draw highlights under pieces
         drawPieces();
     }
 
-    function getNeighbors(nodeIndex) {
-        let neighbors = [];
-        connections.forEach(([start, end]) => {
-            if (start === nodeIndex) neighbors.push(end);
-            if (end === nodeIndex) neighbors.push(start);
+    // --- 重合点处理（自动推导，无需手工维护等价对） ---
+    // 本棋盘存在"两个节点ID 指向同一物理位置"的情况：
+    //   节点2 与节点6 坐标相同(200,120)，节点26 与节点29 相同(200,360)
+    // 它们是菱形顶点与网格中点的重合点。这里按坐标自动分组，
+    // 以后若再增加重合节点，无需修改任何判定逻辑。
+    const POS_GROUPS = (() => {
+        const byXY = new Map();
+        nodes.forEach((n, i) => {
+            const key = `${n.x},${n.y}`;
+            if (!byXY.has(key)) byXY.set(key, []);
+            byXY.get(key).push(i);
         });
-        // 合并重合点邻居
-        if (nodeIndex === 2) {
-            connections.forEach(([start, end]) => {
-                if (start === 6) neighbors.push(end);
-                if (end === 6) neighbors.push(start);
+        // 节点ID -> 该位置上的所有节点ID
+        const byPos = new Map();
+        byXY.forEach(ids => ids.forEach(id => byPos.set(id, ids)));
+        return byPos;
+    })();
+
+    // --- 邻接表：同一物理位置上的所有连线合并在一起 ---
+    // 棋盘连线只声明一次；重合点会自动并集，无需为 2/6、26/29 写死 if 分支。
+    const ADJACENCY = (() => {
+        const adj = {};
+        connections.forEach(([a, b]) => {
+            (adj[a] ??= new Set()).add(b);
+            (adj[b] ??= new Set()).add(a);
+        });
+        // 按位置合并：位置P的邻居 = 其所有节点邻居所在位置的代表节点
+        const byPos = {};
+        for (const nodeIdStr of Object.keys(adj)) {
+            const nodeId = Number(nodeIdStr);
+            const eq = POS_GROUPS.get(nodeId);
+            if (!byPos[nodeId]) byPos[nodeId] = new Set();
+            adj[nodeIdStr].forEach(nb => {
+                // 邻居若也是重合点，取该位置的代表节点，保证去重
+                byPos[nodeId].add(nb);
+            });
+            eq.forEach(alias => {
+                if (alias !== nodeId && adj[alias]) {
+                    adj[alias].forEach(nb => byPos[nodeId].add(nb));
+                }
             });
         }
-        if (nodeIndex === 6) {
-            connections.forEach(([start, end]) => {
-                if (start === 2) neighbors.push(end);
-                if (end === 2) neighbors.push(start);
-            });
-        }
-        if (nodeIndex === 26) {
-            connections.forEach(([start, end]) => {
-                if (start === 29) neighbors.push(end);
-                if (end === 29) neighbors.push(start);
-            });
-        }
-        if (nodeIndex === 29) {
-            connections.forEach(([start, end]) => {
-                if (start === 26) neighbors.push(end);
-                if (end === 26) neighbors.push(start);
-            });
-        }
-        return [...new Set(neighbors)]; // Return unique neighbors
+        return byPos;
+    })();
+
+    function getNeighbors(nodeIndex) {
+        return [...(ADJACENCY[nodeIndex] ?? new Set())];
     }
 
-    function getAllEquivalentIndices(idx) {
-        if (idx === 2) return [2, 6];
-        if (idx === 6) return [2, 6];
-        if (idx === 26) return [26, 29];
-        if (idx === 29) return [26, 29];
-        return [idx];
+    // 返回与 nodeIndex 占据同一物理位置的全部节点ID
+    function equivalentsOf(nodeIndex) {
+        return POS_GROUPS.get(nodeIndex) ?? [nodeIndex];
+    }
+
+    // 读取某位置的棋子：重合点可能只登记在其中一个槽位，
+    // 因此必须取整个等价集合中非空的那个，否则会误判为"空位"。
+    function pieceAt(nodeIndex) {
+        const eq = equivalentsOf(nodeIndex);
+        for (const i of eq) {
+            if (gameState.board[i] !== 0) return gameState.board[i];
+        }
+        return 0;
+    }
+
+    // 规范化：把任意节点ID替换为该位置上真实登记棋子的那个ID；
+    // 若整个位置为空，则返回用于落子的ID
+    function normalizeIndex(nodeIndex, wantPiece) {
+        const eq = equivalentsOf(nodeIndex);
+        if (wantPiece) {
+            for (const i of eq) {
+                if (gameState.board[i] !== 0) return i;
+            }
+            return eq[0];
+        }
+        return pieceAt(nodeIndex) === 0 ? nodeIndex : eq[0];
+    }
+
+    // 清空一个物理位置上的所有棋子（重合点可能分布在多个槽位）
+    function clearPosition(nodeIndex) {
+        equivalentsOf(nodeIndex).forEach(i => { gameState.board[i] = 0; });
+    }
+
+    // 在物理位置上放置棋子（不覆盖已有棋子）
+    function placePiece(nodeIndex, piece) {
+        const eq = equivalentsOf(nodeIndex);
+        // 优先复用已有槽位，否则落到第一个
+        let slot = eq.find(i => gameState.board[i] !== 0);
+        if (slot === undefined) slot = eq[0];
+        clearPosition(nodeIndex);
+        gameState.board[slot] = piece;
+        return slot;
     }
 
     function calculateValidMoves(pieceIndex) {
-        const pieceType = gameState.board[pieceIndex];
+        const pieceType = pieceAt(pieceIndex);
         const moves = [];
         // 合并所有等价点的邻居（单步走和跳吃一致）
         let neighbors = [];
-        getAllEquivalentIndices(pieceIndex).forEach(idx => {
+        equivalentsOf(pieceIndex).forEach(idx => {
             neighbors = neighbors.concat(getNeighbors(idx));
         });
         neighbors = [...new Set(neighbors)];
 
         if (pieceType === 1) { // Sheep movement
             neighbors.forEach(neighbor => {
-                if (gameState.board[neighbor] === 0) {
+                if (pieceAt(neighbor) === 0) {
                     moves.push({ to: neighbor, type: 'MOVE' });
                 }
             });
         } else if (pieceType === 2) { // Wolf movement
-            console.log(`检查狼在位置${pieceIndex}的移动路线...`);
             neighbors.forEach(neighbor => {
-                if (gameState.board[neighbor] === 0) {
-                    console.log(`狼可以从${pieceIndex}移动到${neighbor}`);
+                if (pieceAt(neighbor) === 0) {
                     moves.push({ to: neighbor, type: 'MOVE' });
-                } else if (gameState.board[neighbor] === 1) {
+                } else if (pieceAt(neighbor) === 1) {
                     // 检查跳吃：neighbor为over
                     const over = neighbor;
                     let overNeighbors = getNeighbors(over);
                     overNeighbors = [...new Set(overNeighbors)];
                     overNeighbors.forEach(jumpTo => {
-                        // 检查是否是通过重合点进行的不合理跳吃
+                        // 检查是否通过重合点进行的不合理跳吃：
+                        // 从重合位置起跳、跳过网格边上的点、又落回同一重合位置，
+                        // 等于"原地不动"，不算有效吃子。
+                        const samePos = (a, b) => equivalentsOf(a).includes(b);
                         const isInvalidJump = (
-                            (getAllEquivalentIndices(pieceIndex).includes(2) || getAllEquivalentIndices(pieceIndex).includes(6)) &&
-                            over === 7 && 
-                            (getAllEquivalentIndices(jumpTo).includes(2) || getAllEquivalentIndices(jumpTo).includes(6))
+                            over === 7 && samePos(pieceIndex, jumpTo)
                         ) || (
-                            (getAllEquivalentIndices(pieceIndex).includes(26) || getAllEquivalentIndices(pieceIndex).includes(29)) &&
-                            over === 27 && 
-                            (getAllEquivalentIndices(jumpTo).includes(26) || getAllEquivalentIndices(jumpTo).includes(29))
+                            over === 27 && samePos(pieceIndex, jumpTo)
                         );
-                        
+
                         // 首先检查基本跳吃条件
                         const basicJumpValid = (
-                            jumpTo !== pieceIndex &&
-                            gameState.board[jumpTo] === 0 &&
-                            gameState.board[over] === 1 &&
+                            !samePos(pieceIndex, jumpTo) &&
+                            pieceAt(jumpTo) === 0 &&
+                            pieceAt(over) === 1 &&
                             !isInvalidJump
                         );
                         
                         // 然后检查是否在预定义的跳吃路径中
+                        // 比较时对重合点做等价匹配，避免因槽位不同而漏判
                         const pathValid = validJumpPaths.some(path => {
                             const [a, b, c] = path;
-                            const condition1 = getAllEquivalentIndices(pieceIndex).includes(a) && over === b && getAllEquivalentIndices(jumpTo).includes(c);
-                            const condition2 = getAllEquivalentIndices(jumpTo).includes(a) && over === b && getAllEquivalentIndices(pieceIndex).includes(c);
-                            console.log(`[路径验证] 路径[${a},${b},${c}]:`, {
-                                pieceIndex,
-                                over,
-                                jumpTo,
-                                eqFrom: getAllEquivalentIndices(pieceIndex),
-                                eqTo: getAllEquivalentIndices(jumpTo),
-                                condition1,
-                                condition2,
-                                result: condition1 || condition2
-                            });
+                            const overEq = equivalentsOf(b);
+                            const condition1 = equivalentsOf(pieceIndex).includes(a) && overEq.includes(over) && equivalentsOf(jumpTo).includes(c);
+                            const condition2 = equivalentsOf(jumpTo).includes(a) && overEq.includes(over) && equivalentsOf(pieceIndex).includes(c);
                             return condition1 || condition2;
                         });
-                        
+
                         const isValidJump = basicJumpValid && pathValid;
-                        
-                        console.log(`[跳吃基本条件] 从${pieceIndex}跳过${over}到${jumpTo}:`, {
-                            basicJumpValid,
-                            pathValid,
-                            finalValid: isValidJump,
-                            overPiece: gameState.board[over],
-                            toPiece: gameState.board[jumpTo],
-                            overIsSheep: gameState.board[over] === 1,
-                            toIsEmpty: gameState.board[jumpTo] === 0,
-                            notSamePosition: jumpTo !== pieceIndex,
-                            notInvalidJump: !isInvalidJump
-                        });
-                        // 调试输出 - 始终显示
-                        console.log('[跳吃判定]', {
-                            from: pieceIndex,
-                            over,
-                            to: jumpTo,
-                            fromNeighbors: getNeighbors(pieceIndex),
-                            overNeighbors: overNeighbors,
-                            board: [...gameState.board],
-                            valid: isValidJump,
-                            invalidReason: isInvalidJump ? '通过重合点不合理跳吃' : '正常'
-                        });
+
                         if (isValidJump) {
-                            console.log(`狼可以从${pieceIndex}跳过${over}到${jumpTo}`);
                             moves.push({ to: jumpTo, type: 'JUMP', jumped: over });
                         }
                     });
                 }
             });
         }
-        console.log(`位置${pieceIndex}的总可走路线:`, moves);
         return moves;
     }
 
@@ -717,29 +800,27 @@
     }
 
     function checkWolfCanMove() {
-        console.log('检查狼是否有路可走...');
         let wolfPositions = [];
-        
+
         // 找到所有狼的位置
         for (let i = 0; i < gameState.board.length; i++) {
             if (gameState.board[i] === 2) {
                 wolfPositions.push(i);
             }
         }
-        
-        console.log('狼的位置:', wolfPositions);
-        
-        // 检查每只狼是否有路可走
+
+        // 没有任何狼视为无路可走
+        if (wolfPositions.length === 0) return false;
+
+        // 检查每只狼是否有路可走（移动或吃子都算）
+        // 判定标准：两只狼都无法移动且无法吃子时，判羊获胜。
+        // 菱形窝内的移动同样是合法走法，不得排除。
         for (let wolfPos of wolfPositions) {
-            const moves = calculateValidMoves(wolfPos);
-            console.log(`狼在位置${wolfPos}的可走路线:`, moves);
-            if (moves.length > 0) {
-                console.log('狼有路可走');
+            if (calculateValidMoves(wolfPos).length > 0) {
                 return true;
             }
         }
-        
-        console.log('所有狼都无路可走！');
+
         return false;
     }
 
@@ -747,6 +828,8 @@
         if (gameState.gameOver) return;
 
         const rect = canvas.getBoundingClientRect();
+        if (!rect.width || !rect.height) return;
+        // canvas.width 已按 devicePixelRatio 放大，此处换算回逻辑坐标
         const scaleX = canvas.width / rect.width;
         const scaleY = canvas.height / rect.height;
         const x = (event.clientX - rect.left) * scaleX;
@@ -760,13 +843,13 @@
 
         const { turn, phase } = gameState;
 
-        const eqIndices = getAllEquivalentIndices(clickedNodeIndex);
-        console.log('点击的节点:', clickedNodeIndex, '等价集合:', eqIndices);
+        const eqIndices = equivalentsOf(clickedNodeIndex);
 
         if (turn === 'SHEEP') {
             if (phase === 'PLACEMENT') {
-                if (gameState.board[clickedNodeIndex] === 0) {
-                    gameState.board[clickedNodeIndex] = 1;
+                // 用 pieceAt 判定，避免同一物理位置被重复放羊
+                if (pieceAt(clickedNodeIndex) === 0) {
+                    placePiece(clickedNodeIndex, 1);
                     gameState.sheepInHand--;
                     gameState.sheepOnBoard++;
                     if (gameState.sheepInHand === 0) {
@@ -777,7 +860,6 @@
                     if (!checkWolfCanMove()) {
                         gameState.gameOver = true;
                         gameState.winner = 'SHEEP';
-                        console.log('游戏结束：狼无路可走，羊获胜！');
                     }
                     checkWinConditions();
                 }
@@ -798,7 +880,6 @@
             if (!checkWolfCanMove()) {
                 gameState.gameOver = true;
                 gameState.winner = 'SHEEP';
-                console.log('游戏结束：狼无路可走，羊获胜！');
                 updateStatus();
                 draw();
                 return;
@@ -820,21 +901,11 @@
     }
 
     function handlePieceMovement(clickedIndex, pieceType, nextTurn) {
-        // 归一化：如果点击的是等价点集合，找到实际有棋子的 index（选中）或空位 index（移动）
-        const eqIndices = getAllEquivalentIndices(clickedIndex);
-        let realClickedIndex = clickedIndex;
-        if (gameState.selectedPieceIndex === -1) {
-            // 选中阶段，找有棋子的 index
-            const found = eqIndices.find(idx => gameState.board[idx] === pieceType);
-            if (found !== undefined) realClickedIndex = found;
-        } else {
-            // 移动阶段，找空位
-            const found = eqIndices.find(idx => gameState.board[idx] === 0);
-            if (found !== undefined) realClickedIndex = found;
-        }
+        // 归一化到该物理位置上真实登记棋子的槽位（重合点可能有多个ID）
+        const realClickedIndex = normalizeIndex(clickedIndex, gameState.selectedPieceIndex === -1);
 
         // 选中棋子
-        if (gameState.board[realClickedIndex] === pieceType && gameState.selectedPieceIndex !== realClickedIndex) {
+        if (pieceAt(realClickedIndex) === pieceType && gameState.selectedPieceIndex !== realClickedIndex) {
             gameState.selectedPieceIndex = realClickedIndex;
             gameState.validMoves = calculateValidMoves(realClickedIndex);
         }
@@ -845,28 +916,18 @@
         }
         // 移动/跳吃
         else if (gameState.selectedPieceIndex !== -1) {
-            // 目标点也要归一化：允许点击等价集合内任意点
-            const move = gameState.validMoves.find(m => getAllEquivalentIndices(m.to).includes(realClickedIndex));
+            // 目标点也要归一化：允许点击同一物理位置上的任意节点ID
+            const move = gameState.validMoves.find(m => equivalentsOf(m.to).includes(realClickedIndex));
             if (move) {
-                // 清理所有等价点
-                const allEq = Array.from(new Set([
-                    ...getAllEquivalentIndices(move.to),
-                    ...getAllEquivalentIndices(gameState.selectedPieceIndex)
-                ]));
-                allEq.forEach(idx => {
-                    gameState.board[idx] = 0;
-                });
-                // 只在目标点赋值
-                gameState.board[move.to] = pieceType;
+                // 清空起点与终点的整个物理位置，再落到终点
+                clearPosition(gameState.selectedPieceIndex);
+                clearPosition(move.to);
+                placePiece(move.to, pieceType);
 
-                if (move.type === 'JUMP') {
-                    getAllEquivalentIndices(move.jumped).forEach(idx => {
-                        if (gameState.board[idx] === 1) {
-                            gameState.board[idx] = 0;
-                            gameState.sheepEaten++;
-                            gameState.sheepOnBoard--;
-                        }
-                    });
+                if (move.type === 'JUMP' && pieceAt(move.jumped) === 1) {
+                    clearPosition(move.jumped);
+                    gameState.sheepEaten++;
+                    gameState.sheepOnBoard--;
                 }
 
                 // Reset selection and switch turn
@@ -888,7 +949,14 @@
 
 
     // --- Event Listeners ---
-    canvas.addEventListener('click', handleCanvasClick);
+    // pointerdown 统一处理鼠标与触摸，移动端无 300ms 延迟，点击位置也更精确
+    if (window.PointerEvent) {
+        canvas.addEventListener('pointerdown', handleCanvasClick);
+    } else {
+        canvas.addEventListener('touchstart', handleCanvasClick, { passive: true });
+        canvas.addEventListener('mousedown', handleCanvasClick);
+    }
+    canvas.addEventListener('contextmenu', e => e.preventDefault());
     restartBtn.addEventListener('click', setupNewGame);
 
     // 游戏规则弹窗逻辑
@@ -911,7 +979,25 @@
     };
 
     // --- Initial Game Start ---
+    fitCanvas();
     setupNewGame();
+
+    // 视口尺寸/方向变化时重算画布显示尺寸
+    let resizeTimer = null;
+    function handleResize() {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+            fitCanvas();
+            draw();
+        }, 100);
+    }
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', handleResize);
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', handleResize);
+    }
+    // 字体/布局加载完成后再次校准，防止首屏尺寸偏差
+    window.addEventListener('load', handleResize);
     </script>
 </body>
 </html>
